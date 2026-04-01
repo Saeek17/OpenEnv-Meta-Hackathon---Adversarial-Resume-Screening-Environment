@@ -1,0 +1,22 @@
+{
+  "easy": [
+    {
+      "id": "E1",
+      "resume": "Software Engineer \u2013 Backend (5 years)\n\nExperience:\n- Infosys (2019\u20132024)\n- Developed REST APIs using Python and Flask\n- Designed microservices architecture\n\nSkills:\nPython, Flask, AWS, Docker, MySQL\n\nProjects:\n- Built internal analytics dashboard",
+      "job": "Looking for backend developer with 3+ years experience in Python and APIs.",
+      "is_fraud": false,
+      "expected_decision": "accept",
+      "reason": "Strong skill and experience match"
+    },
+    {
+      "id": "E2",
+      "resume": "Senior Software Engineer (15 years)\n\nExperience:\n- Google (2009\u20132024)\n- Led large-scale distributed systems\n\nNote: Candidate age mentioned as 23",
+      "job": "Senior Software Engineer with 5+ years experience.",
+      "is_fraud": true,
+      "expected_decision": "reject",
+      "reason": "Impossible experience claim"
+    }
+  ],
+  "medium": [],
+  "hard": []
+}

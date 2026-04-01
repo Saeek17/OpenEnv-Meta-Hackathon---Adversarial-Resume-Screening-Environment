@@ -1,0 +1,23 @@
+name: adversarial-resume-screening
+version: 1.0.0
+description: "An environment where AI agents evaluate resumes against job descriptions and detect fraudulent claims."
+
+# Define the observation structure
+observation:
+  resume_text: string
+  job_description: string
+  task_type: string
+
+# Define the action space
+action:
+  decision: string
+  fraud_flag: boolean
+  confidence: float
+
+# Reward configuration
+reward_range: [-1.0, 1.0]
+
+# Metadata for OpenEnv validation
+requirements:
+  - openenv-core>=0.1.0
+  - python>=3.11
