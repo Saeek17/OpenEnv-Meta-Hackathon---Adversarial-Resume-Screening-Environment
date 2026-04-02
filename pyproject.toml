@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "adversarial-resume-screening"
+version = "1.0.0"
+description = "AI agent environment for evaluating resumes and detecting fraud."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Ishika"}
+]
+dependencies = [
+    "openenv-core",
+    "pydantic",
+    "fastapi",
+    "uvicorn",
+    "openai"
+]
+
+[project.scripts]
+server = "server.app:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["server*", "models.py", "client.py", "data*"]
