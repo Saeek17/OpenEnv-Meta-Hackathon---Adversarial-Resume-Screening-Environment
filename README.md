@@ -1,3 +1,13 @@
+---
+title: Adversarial Resume Screening
+emoji: 📄
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+pinned: false
+app_port: 8000
+---
+
 # Adversarial Resume Screening Environment
 
 A production-grade OpenEnv environment where an AI agent evaluates resumes against job descriptions and detects fraud.
