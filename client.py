@@ -14,16 +14,25 @@ class ResumeEnv(EnvClient[ResumeObservation, ResumeAction, ResumeState]):
         """
         return action.model_dump()
 
-    def _parse_result(self, response: Dict[str, Any]) -> Tuple[ResumeObservation, float, bool, Dict[str, Any]]:
+    def _parse_result(self, response: Dict[str, Any]) -> ResumeObservation:
         """
-        Converts the API response into a Tuple containing ResumeObservation, reward, done, and info.
+        Converts the API response into a ResumeObservation.
+        Handles both nested and flattened observation data.
         """
-        observation = ResumeObservation(**response["observation"])
-        reward = float(response["reward"])
-        done = bool(response["done"])
-        info = response.get("info", {})
+        data = response.copy()
         
-        return observation, reward, done, info
+        # Flatten nested observation if present
+        if "observation" in data and isinstance(data["observation"], dict):
+            obs_data = data.pop("observation")
+            data.update(obs_data)
+            
+        # Ensure reward and done have default values if missing or None
+        if data.get("reward") is None:
+            data["reward"] = 0.0
+        if data.get("done") is None:
+            data["done"] = False
+            
+        return ResumeObservation(**data)
 
     def _parse_state(self, response: Dict[str, Any]) -> ResumeState:
         """
@@ -35,4 +44,4 @@ class ResumeEnv(EnvClient[ResumeObservation, ResumeAction, ResumeState]):
         """
         Converts the API response from /reset into a ResumeObservation.
         """
-        return ResumeObservation(**response)
+        return self._parse_result(response)

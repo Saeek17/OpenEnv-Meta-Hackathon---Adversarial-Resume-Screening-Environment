@@ -1,6 +1,6 @@
 from openenv.core.env_server import Action, Observation, State
 from pydantic import Field
-from typing import Literal
+from typing import Literal, Optional
 
 class ResumeObservation(Observation):
     """
@@ -9,6 +9,8 @@ class ResumeObservation(Observation):
     resume_text: str = Field(..., description="The full text of the resume.")
     job_description: str = Field(..., description="The job description to evaluate the resume against.")
     task_type: Literal["easy", "medium", "hard"] = Field(..., description="The difficulty level of the current task.")
+    done: bool = Field(False, description="Whether the episode is finished.")
+    reward: Optional[float] = Field(0.0, description="The reward for the last action.")
 
 class ResumeAction(Action):
     """
@@ -25,3 +27,8 @@ class ResumeState(State):
     current_index: int = Field(..., description="The index of the current resume in the dataset.")
     task_type: str = Field(..., description="The difficulty level of the current task.")
     step_count: int = Field(..., description="The number of actions taken in the current episode.")
+
+# Rebuild models for Pydantic v2 compatibility
+ResumeObservation.model_rebuild()
+ResumeAction.model_rebuild()
+ResumeState.model_rebuild()
