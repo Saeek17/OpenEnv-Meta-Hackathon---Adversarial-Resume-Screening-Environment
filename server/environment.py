@@ -68,13 +68,13 @@ class ResumeScreeningEnvironment(Environment[ResumeObservation, ResumeAction, Re
             task_type=self._current_task_type
         )
 
-    def step(self, action: ResumeAction) -> Any:
+    def step(self, action: ResumeAction) -> ResumeObservation:
         """
         Evaluates the agent's action and ends the episode.
-        Returns (observation, reward, done, info)
+        Returns ONLY the ResumeObservation object (with reward/done populated).
         """
         if self._current_sample is None:
-            return self._get_empty_observation(), 0.0, True, {"error": "Environment not reset"}
+            return self._get_empty_observation(done=True)
 
         # 1. Validation Logic
         is_invalid = (
@@ -84,13 +84,11 @@ class ResumeScreeningEnvironment(Environment[ResumeObservation, ResumeAction, Re
         )
         
         if is_invalid:
-            return self._get_empty_observation(), 0.0, True, {"error": "Invalid action"}
+            return self._get_empty_observation(done=True, reward=0.0)
 
         self._step_count += 1
-        done = True  # Each episode contains exactly one resume action
         
         # 2. Extract ground truth
-        print("DEBUG SAMPLE:", self._current_sample)
         expected_decision = self._current_sample.get("expected_decision", "reject")
         is_fraud_truth = self._current_sample.get("is_fraud", False)
 
@@ -118,16 +116,19 @@ class ResumeScreeningEnvironment(Environment[ResumeObservation, ResumeAction, Re
             reward += 0.2
 
         # 4. Final Reward Normalization (max 0.0, min 1.0)
-        final_reward = max(0.0, min(1.0, reward))
+        final_reward = float(max(0.0, min(1.0, reward)))
 
-        return self._get_empty_observation(), float(final_reward), True, {}
+        # Return the observation object itself (OpenEnv wrapper extracts reward/done from it)
+        return self._get_empty_observation(done=True, reward=final_reward)
 
-    def _get_empty_observation(self) -> ResumeObservation:
+    def _get_empty_observation(self, done: bool = False, reward: float = 0.0) -> ResumeObservation:
         """Helper to return an observation with empty fields after the episode ends."""
         return ResumeObservation(
             resume_text="",
             job_description="",
-            task_type=self._current_task_type if self._current_task_type in ["easy", "medium", "hard"] else "easy"
+            task_type=self._current_task_type if self._current_task_type in ["easy", "medium", "hard"] else "easy",
+            done=done,
+            reward=reward
         )
 
     @property
