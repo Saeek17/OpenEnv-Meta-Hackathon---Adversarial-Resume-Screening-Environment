@@ -65,9 +65,7 @@ class ResumeScreeningEnvironment(Environment[ResumeObservation, ResumeAction, Re
         return ResumeObservation(
             resume_text=self._current_sample["resume"],
             job_description=self._current_sample["job"],
-            task_type=self._current_task_type,
-            done=False,
-            reward=None
+            task_type=self._current_task_type
         )
 
     def step(self, action: ResumeAction) -> ResumeObservation:
@@ -78,12 +76,12 @@ class ResumeScreeningEnvironment(Environment[ResumeObservation, ResumeAction, Re
         # 1. Validation Logic
         is_invalid = (
             action.decision not in ["accept", "reject"] or
-            not (0.0 <= action.confidence <= 1.0)
+            not (0.0 <= action.confidence <= 1.0) or
+            not isinstance(action.fraud_flag, bool)
         )
         
         if is_invalid:
-            # If action is invalid: reward = 0.0, done = True
-            return self._get_empty_observation(done=True, reward=0.0)
+            return self._get_empty_observation(), 0.0, True, {"error": "Invalid action"}
 
         self._step_count += 1
         done = True  # Each episode contains exactly one resume action
@@ -118,16 +116,14 @@ class ResumeScreeningEnvironment(Environment[ResumeObservation, ResumeAction, Re
         # 4. Final Reward Normalization (max 0.0, min 1.0)
         final_reward = max(0.0, min(1.0, reward))
 
-        return self._get_empty_observation(done=True, reward=final_reward)
+        return self._get_empty_observation(), float(final_reward), True, {}
 
-    def _get_empty_observation(self, done: bool = False, reward: float = None) -> ResumeObservation:
+    def _get_empty_observation(self) -> ResumeObservation:
         """Helper to return an observation with empty fields after the episode ends."""
         return ResumeObservation(
             resume_text="",
             job_description="",
-            task_type=self._current_task_type,
-            done=done,
-            reward=reward
+            task_type=self._current_task_type if self._current_task_type else "None"
         )
 
     @property
