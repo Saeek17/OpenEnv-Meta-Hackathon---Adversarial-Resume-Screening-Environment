@@ -29,9 +29,16 @@ STDOUT FORMAT
 
 import asyncio
 import os
+import sys
 import json
 import textwrap
+import warnings
 from typing import List, Optional
+
+# Suppress library warnings and stderr to ensure strict 'Exactly three line types' stdout compliance
+# This must happen before other imports to catch 'import-time' warnings
+warnings.filterwarnings("ignore")
+sys.stderr = open(os.devnull, 'w')
 
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -48,11 +55,11 @@ else:
 
 # Deployment variables as defined in the mandatory submission checklist
 HF_TOKEN = os.getenv("HF_TOKEN")
-API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o")
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.groq.com/openai/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "llama-3.3-70b-versatile")
 
 # Local fallback for the environment server
-ENV_URL = os.getenv("ENV_URL", "http://localhost:8000")
+ENV_URL = os.getenv("ENV_URL", "https://ishikamahadar-resume-env.hf.space")
 
 # Task Configuration
 TASK_NAME = os.getenv("RESUME_TASK", "resume-screening")
