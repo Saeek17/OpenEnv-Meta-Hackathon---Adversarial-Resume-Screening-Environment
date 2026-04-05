@@ -46,16 +46,12 @@ if os.path.exists(env_path):
 else:
     load_dotenv()
 
-# Environment Configuration
-# We check for keys in a specific order to avoid using empty/expired ones accidentally
-API_KEY = (
-    os.getenv("API_KEY") or 
-    os.getenv("GROQ_API_KEY") or 
-    os.getenv("OPENAI_API_KEY") or 
-    os.getenv("HF_TOKEN")
-)
+# Deployment variables as defined in the mandatory submission checklist
+HF_TOKEN = os.getenv("HF_TOKEN")
 API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o")
+
+# Local fallback for the environment server
 ENV_URL = os.getenv("ENV_URL", "http://localhost:8000")
 
 # Task Configuration
@@ -181,13 +177,12 @@ def get_model_decision(
             "confidence": float(content.get("confidence", 0.5))
         }
         
-    except Exception as e:
-        print(f"[DEBUG] LLM request failed: {e}, using fallback", flush=True)
+    except Exception:
         return fallback_action
 
 
 async def main() -> None:
-    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+    client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
     env = ResumeEnv(base_url=ENV_URL)
     
     history: List[str] = []
@@ -228,8 +223,7 @@ async def main() -> None:
         score = min(max(total_reward / MAX_TOTAL_REWARD, 0.0), 1.0) if MAX_TOTAL_REWARD > 0 else 0.0
         success = score >= SUCCESS_SCORE_THRESHOLD
         
-    except Exception as e:
-        print(f"[DEBUG] Critical error: {e}", flush=True)
+    except Exception:
         success = False
     
     finally:
