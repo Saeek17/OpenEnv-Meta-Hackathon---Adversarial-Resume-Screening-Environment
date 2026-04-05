@@ -9,7 +9,20 @@ app = create_fastapi_app(
     observation_cls=ResumeObservation
 )
 
-from fastapi.responses import HTMLResponse
+from fastapi import Request
+from fastapi.responses import HTMLResponse, JSONResponse
+import traceback
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={
+            "message": "Internal Server Error",
+            "detail": str(exc),
+            "traceback": traceback.format_exc()
+        }
+    )
 
 @app.get("/", response_class=HTMLResponse)
 @app.get("/web", response_class=HTMLResponse)
