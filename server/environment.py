@@ -300,9 +300,6 @@ class ResumeScreeningEnvironment(Environment[ResumeObservation, ResumeAction, Re
         if self._step_count == 1 and len(self._sections_viewed) <= 1:
             reward -= 0.15
 
-        # Add accumulated investigation reward
-        reward += self._investigation_score
-
         # Clamp to [-1.0, 1.0]
         final_reward = max(-1.0, min(1.0, reward))
 
