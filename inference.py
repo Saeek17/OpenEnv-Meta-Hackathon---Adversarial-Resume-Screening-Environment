@@ -25,7 +25,9 @@ import warnings
 from typing import List, Optional
 
 warnings.filterwarnings("ignore")
-sys.stderr = open(os.devnull, "w")
+# Suppress noisy library logs but keep stderr usable for real errors
+import logging
+logging.disable(logging.WARNING)
 
 from openai import OpenAI
 from dotenv import load_dotenv

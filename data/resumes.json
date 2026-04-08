@@ -13,8 +13,14 @@
         "references": "Rahul Mehta, Engineering Manager at Infosys | rahul.mehta@infosys.com\nPreeti Nair, Tech Lead at TCS | preeti.nair@tcs.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Rahul Mehta", "response": "Amit was a reliable backend engineer. He worked on our payment module and delivered on time. I would recommend him."},
-        "ref2": {"name": "Preeti Nair", "response": "Amit worked under me for 2 years. Good Python skills, solid team player."}
+        "ref1": {
+          "name": "Rahul Mehta",
+          "response": "Amit was a reliable backend engineer. He worked on our payment module and delivered on time. I would recommend him."
+        },
+        "ref2": {
+          "name": "Preeti Nair",
+          "response": "Amit worked under me for 2 years. Good Python skills, solid team player."
+        }
       },
       "clarification_answers": {
         "experience_depth": "I primarily used Flask for REST APIs and Django for internal tools. Most of my work involved designing database schemas and writing optimized SQL queries.",
@@ -45,7 +51,10 @@
         "references": "James Liu, Senior Engineer at Stripe | james.liu@stripe.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "James Liu", "response": "Sarah was an excellent frontend engineer. She built key components for our merchant dashboard. Strong React skills and great eye for design."}
+        "ref1": {
+          "name": "James Liu",
+          "response": "Sarah was an excellent frontend engineer. She built key components for our merchant dashboard. Strong React skills and great eye for design."
+        }
       },
       "clarification_answers": {
         "experience_depth": "I have deep experience with React hooks, context API, and Redux for state management. I also have experience with Next.js for server-side rendering.",
@@ -76,7 +85,10 @@
         "references": "Marie Dupont, Executive Chef at Le Bernardin | m.dupont@lebern.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Marie Dupont", "response": "Carlos is an exceptional pastry chef. His creativity and attention to detail are outstanding."}
+        "ref1": {
+          "name": "Marie Dupont",
+          "response": "Carlos is an exceptional pastry chef. His creativity and attention to detail are outstanding."
+        }
       },
       "clarification_answers": {
         "technical_skills": "My technical skills are in pastry arts and kitchen management. I do not have programming or data science experience.",
@@ -107,7 +119,10 @@
         "references": "Vikram Singh, Creative Director at Ogilvy | vikram.s@ogilvy.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Vikram Singh", "response": "Priya is a talented marketing professional. She consistently delivers creative campaign ideas and meets deadlines."}
+        "ref1": {
+          "name": "Vikram Singh",
+          "response": "Priya is a talented marketing professional. She consistently delivers creative campaign ideas and meets deadlines."
+        }
       },
       "clarification_answers": {
         "technical_skills": "My technical skills are in marketing tools like Google Analytics, Hootsuite, and Canva. I have no experience with cloud infrastructure or DevOps.",
@@ -138,7 +153,10 @@
         "references": "Jeff Dean, SVP at Google | jeff.dean@google.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Jeff Dean", "response": "I'm not familiar with a Michael Zhang on my team. Please verify the reference."}
+        "ref1": {
+          "name": "Jeff Dean",
+          "response": "I'm not familiar with a Michael Zhang on my team. Please verify the reference."
+        }
       },
       "clarification_answers": {
         "age_discrepancy": "I started college early through an accelerated program.",
@@ -152,7 +170,11 @@
       "ground_truth": {
         "decision": "reject",
         "is_fraud": true,
-        "fraud_indicators": ["age_experience_impossible", "reference_denial", "timeline_impossible"],
+        "fraud_indicators": [
+          "age_experience_impossible",
+          "reference_denial",
+          "timeline_impossible"
+        ],
         "reasoning": "Candidate claims 15 years experience but is only 23 years old. Claims PhD from MIT completed at age 2. Reference at Google denies knowing the candidate."
       }
     },
@@ -169,7 +191,10 @@
         "references": "David Kim, iOS Lead at Snap Inc. | david.kim@snap.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "David Kim", "response": "Lisa was a key contributor to our camera team. Her Swift skills are excellent and she shipped several important features."}
+        "ref1": {
+          "name": "David Kim",
+          "response": "Lisa was a key contributor to our camera team. Her Swift skills are excellent and she shipped several important features."
+        }
       },
       "clarification_answers": {
         "android_experience": "My primary expertise is iOS/Swift. I have limited Android/Kotlin experience but am willing to learn.",
@@ -200,7 +225,10 @@
         "references": "Jisoo Kim, Engineering Manager at Coupang | jisoo.k@coupang.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Jisoo Kim", "response": "Daniel is an excellent fullstack engineer. He owned the seller dashboard project end-to-end and delivered high-quality code."}
+        "ref1": {
+          "name": "Jisoo Kim",
+          "response": "Daniel is an excellent fullstack engineer. He owned the seller dashboard project end-to-end and delivered high-quality code."
+        }
       },
       "clarification_answers": {
         "experience_depth": "I've worked extensively with Express.js and Next.js for backend and frontend respectively. I'm comfortable designing database schemas and writing complex SQL queries.",
@@ -231,7 +259,10 @@
         "references": "Thomas Brown, Chief Engineer at JLR | thomas.brown@jlr.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Thomas Brown", "response": "Robert is a skilled mechanical engineer with excellent analytical abilities. His work on our EV platform was outstanding."}
+        "ref1": {
+          "name": "Thomas Brown",
+          "response": "Robert is a skilled mechanical engineer with excellent analytical abilities. His work on our EV platform was outstanding."
+        }
       },
       "clarification_answers": {
         "ml_experience": "I have a hobby interest in computer vision but no professional ML experience. My MATLAB skills are for engineering simulation, not machine learning.",
@@ -262,8 +293,14 @@
         "references": "Elon Musk | elon@tesla.com\nTim Cook | tim@apple.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Elon Musk", "response": "Reference contact could not be verified. Email bounced."},
-        "ref2": {"name": "Tim Cook", "response": "Reference contact could not be verified. Email bounced."}
+        "ref1": {
+          "name": "Elon Musk",
+          "response": "Reference contact could not be verified. Email bounced."
+        },
+        "ref2": {
+          "name": "Tim Cook",
+          "response": "Reference contact could not be verified. Email bounced."
+        }
       },
       "clarification_answers": {
         "experience_depth": "I know everything. There is nothing I cannot do.",
@@ -277,7 +314,12 @@
       "ground_truth": {
         "decision": "reject",
         "is_fraud": true,
-        "fraud_indicators": ["obviously_fabricated", "impossible_claims", "fake_references", "nonexistent_institution"],
+        "fraud_indicators": [
+          "obviously_fabricated",
+          "impossible_claims",
+          "fake_references",
+          "nonexistent_institution"
+        ],
         "reasoning": "Blatantly fabricated resume with impossible claims, fake institution, unverifiable references, and absurd experience."
       }
     },
@@ -294,7 +336,10 @@
         "references": "Mike Chen, QA Lead at Nike Digital | mike.chen@nike.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Mike Chen", "response": "Emma was a valuable member of our QA team. She significantly improved our test automation coverage and was always thorough in her testing approach."}
+        "ref1": {
+          "name": "Mike Chen",
+          "response": "Emma was a valuable member of our QA team. She significantly improved our test automation coverage and was always thorough in her testing approach."
+        }
       },
       "clarification_answers": {
         "automation_depth": "I have extensive experience with both Selenium and Cypress. I prefer Cypress for modern web apps but use Selenium for legacy applications.",
@@ -325,7 +370,10 @@
         "references": "Jennifer Wu, Director at AWS Professional Services | jennifer.wu@amazon.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Jennifer Wu", "response": "Alex is one of the best cloud architects I've worked with. His multi-region designs have been adopted as reference architectures by several of our clients."}
+        "ref1": {
+          "name": "Jennifer Wu",
+          "response": "Alex is one of the best cloud architects I've worked with. His multi-region designs have been adopted as reference architectures by several of our clients."
+        }
       },
       "clarification_answers": {
         "certification_status": "I hold AWS Solutions Architect Professional and Associate certifications, both currently valid.",
@@ -356,7 +404,10 @@
         "references": "Prof. Jan Nowak, University of Warsaw | j.nowak@uw.edu.pl"
       },
       "reference_check_results": {
-        "ref1": {"name": "Prof. Jan Nowak", "response": "Nina is an outstanding student with excellent analytical skills. Her thesis work on churn prediction was publication-quality."}
+        "ref1": {
+          "name": "Prof. Jan Nowak",
+          "response": "Nina is an outstanding student with excellent analytical skills. Her thesis work on churn prediction was publication-quality."
+        }
       },
       "clarification_answers": {
         "experience_depth": "My internship at Allegro involved daily SQL queries on large datasets (100M+ rows) and building automated Tableau reports.",
@@ -389,7 +440,10 @@
         "references": "Grace Muthoni, Tech Lead at Safaricom | grace.m@safaricom.co.ke"
       },
       "reference_check_results": {
-        "ref1": {"name": "Grace Muthoni", "response": "Kevin is a strong backend developer. He was instrumental in our M-Pesa integration project. His message queue experience is solid but mostly with RabbitMQ, not Kafka."}
+        "ref1": {
+          "name": "Grace Muthoni",
+          "response": "Kevin is a strong backend developer. He was instrumental in our M-Pesa integration project. His message queue experience is solid but mostly with RabbitMQ, not Kafka."
+        }
       },
       "clarification_answers": {
         "go_java_experience": "I have basic Go knowledge from personal projects but my professional experience is in Python and Node.js. I am confident I can ramp up quickly.",
@@ -420,7 +474,10 @@
         "references": "Tom Martinez, VP Product at Salesforce | tom.m@salesforce.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Tom Martinez", "response": "Rachel is an outstanding product manager. She combines strategic thinking with data-driven execution. Her work on Einstein Analytics was transformative."}
+        "ref1": {
+          "name": "Tom Martinez",
+          "response": "Rachel is an outstanding product manager. She combines strategic thinking with data-driven execution. Her work on Einstein Analytics was transformative."
+        }
       },
       "clarification_answers": {
         "data_approach": "I use SQL daily for ad-hoc analysis and rely heavily on Amplitude for product analytics. Every feature decision is backed by data.",
@@ -451,8 +508,14 @@
         "references": "Amy Chen, CTO at TechStartup Inc. | amy.c@techstartup.com\nMark Davis, Team Lead at Oracle | mark.d@oracle.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Amy Chen", "response": "Jason was our first engineering hire. He built our entire platform and was incredibly versatile. However, I should note that TechStartup Inc. was a 3-person company, so 'entire web platform' was a small-scale application."},
-        "ref2": {"name": "Mark Davis", "response": "Jason was a solid frontend developer on our team. He was primarily focused on React components and didn't have much exposure to backend systems at Oracle."}
+        "ref1": {
+          "name": "Amy Chen",
+          "response": "Jason was our first engineering hire. He built our entire platform and was incredibly versatile. However, I should note that TechStartup Inc. was a 3-person company, so 'entire web platform' was a small-scale application."
+        },
+        "ref2": {
+          "name": "Mark Davis",
+          "response": "Jason was a solid frontend developer on our team. He was primarily focused on React components and didn't have much exposure to backend systems at Oracle."
+        }
       },
       "clarification_answers": {
         "startup_scale": "TechStartup Inc. was an early-stage company. Our platform served about 5k users. I handled all technical decisions as the sole developer.",
@@ -464,10 +527,13 @@
         "certifications_valid": true
       },
       "ground_truth": {
-        "decision": "accept",
-        "is_fraud": false,
-        "fraud_indicators": [],
-        "reasoning": "Acceptable match: has full stack experience in startup environment, but backend depth is limited. References confirm versatility but at small scale. Still a reasonable hire for a startup needing someone comfortable wearing multiple hats."
+        "decision": "reject",
+        "is_fraud": true,
+        "fraud_indicators": [
+          "team_size_inflation",
+          "scope_exaggeration"
+        ],
+        "reasoning": "Reference reveals TechStartup Inc. was a 3-person company, contradicting the impression of leading a team. Claiming to have built an entire web platform misrepresents the scale. Backend depth is limited to small-scale work."
       }
     },
     {
@@ -483,8 +549,14 @@
         "references": "Col. James Barrett, US Army IT Command | j.barrett@army.mil\nSarah Kim, Security Lead at Booz Allen | s.kim@bah.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Col. James Barrett", "response": "Marcus was a reliable IT specialist. He handled network security competently for our base operations."},
-        "ref2": {"name": "Sarah Kim", "response": "Marcus is a solid security analyst. Good with SIEM tools and incident response. He's CompTIA Security+ certified but hasn't pursued CISSP yet."}
+        "ref1": {
+          "name": "Col. James Barrett",
+          "response": "Marcus was a reliable IT specialist. He handled network security competently for our base operations."
+        },
+        "ref2": {
+          "name": "Sarah Kim",
+          "response": "Marcus is a solid security analyst. Good with SIEM tools and incident response. He's CompTIA Security+ certified but hasn't pursued CISSP yet."
+        }
       },
       "clarification_answers": {
         "cissp_status": "I have CompTIA Security+ but not CISSP. I plan to pursue CISSP within the next year.",
@@ -515,7 +587,10 @@
         "references": "Hiroshi Yamada, Data Platform Lead at Rakuten | h.yamada@rakuten.co.jp"
       },
       "reference_check_results": {
-        "ref1": {"name": "Hiroshi Yamada", "response": "Yuki is an exceptional data engineer. Her Spark optimization work saved us significant compute costs. She was instrumental in our Snowflake migration."}
+        "ref1": {
+          "name": "Hiroshi Yamada",
+          "response": "Yuki is an exceptional data engineer. Her Spark optimization work saved us significant compute costs. She was instrumental in our Snowflake migration."
+        }
       },
       "clarification_answers": {
         "spark_depth": "I've worked with both batch and streaming Spark workloads. I'm comfortable with Spark SQL, DataFrames, and performance tuning.",
@@ -546,7 +621,10 @@
         "references": "Olga Petrov, Engineering Director at Yandex | o.petrov@yandex.ru"
       },
       "reference_check_results": {
-        "ref1": {"name": "Olga Petrov", "response": "Pavel is a highly skilled frontend engineer. He led our React migration project and delivered it ahead of schedule. He has deep knowledge of performance optimization for e-commerce."}
+        "ref1": {
+          "name": "Olga Petrov",
+          "response": "Pavel is a highly skilled frontend engineer. He led our React migration project and delivered it ahead of schedule. He has deep knowledge of performance optimization for e-commerce."
+        }
       },
       "clarification_answers": {
         "ecommerce_depth": "At Yandex Market, I worked on product listing pages, checkout flow, and search results - all performance-critical e-commerce pages.",
@@ -577,7 +655,10 @@
         "references": "Dr. Laila Mahmoud, CTO at Vezeeta | laila.m@vezeeta.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Dr. Laila Mahmoud", "response": "Ahmed is a talented backend developer with genuine healthcare domain expertise. His understanding of HIPAA requirements and HL7 FHIR standards is strong. However, his 'HIPAA-compliant' implementation was based on best practices research rather than formal compliance audit."}
+        "ref1": {
+          "name": "Dr. Laila Mahmoud",
+          "response": "Ahmed is a talented backend developer with genuine healthcare domain expertise. His understanding of HIPAA requirements and HL7 FHIR standards is strong. However, his 'HIPAA-compliant' implementation was based on best practices research rather than formal compliance audit."
+        }
       },
       "clarification_answers": {
         "hipaa_depth": "I implemented encryption at rest and in transit, access logging, and role-based access control following HIPAA guidelines. We had not yet undergone formal HIPAA audit but followed industry best practices.",
@@ -590,9 +671,12 @@
       },
       "ground_truth": {
         "decision": "accept",
-        "is_fraud": false,
-        "fraud_indicators": [],
-        "reasoning": "Good match: 5 years Python/Django, healthcare domain experience at Vezeeta. HIPAA implementation was informal but demonstrates understanding."
+        "is_fraud": true,
+        "fraud_indicators": [
+          "compliance_misrepresentation",
+          "hipaa_unaudited"
+        ],
+        "reasoning": "Candidate claims HIPAA-compliant implementation but reference confirms it was based on best practices research, not formal compliance audit. Stating HIPAA compliance without having undergone audit is a material misrepresentation in healthcare, even though technical skills are genuine."
       }
     },
     {
@@ -608,8 +692,14 @@
         "references": "Prof. Alexandru Ionescu, Politehnica University | a.ionescu@upb.ro\nCristian Voicu, ML Lead at UiPath | c.voicu@uipath.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Prof. Alexandru Ionescu", "response": "Diana was an excellent graduate student. Her NLP research was of high quality. She published at top venues."},
-        "ref2": {"name": "Cristian Voicu", "response": "Diana is a strong ML engineer. She shipped multiple NLP models to production and her work on document understanding was critical to our product."}
+        "ref1": {
+          "name": "Prof. Alexandru Ionescu",
+          "response": "Diana was an excellent graduate student. Her NLP research was of high quality. She published at top venues."
+        },
+        "ref2": {
+          "name": "Cristian Voicu",
+          "response": "Diana is a strong ML engineer. She shipped multiple NLP models to production and her work on document understanding was critical to our product."
+        }
       },
       "clarification_answers": {
         "deployment_experience": "I've deployed models using AWS SageMaker and custom Docker containers. I'm experienced with model serving, A/B testing, and monitoring.",
@@ -640,7 +730,10 @@
         "references": "Sinead Murphy, Infrastructure Lead at Stripe | s.murphy@stripe.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Sinead Murphy", "response": "Brian is a reliable DevOps engineer. He handled on-call well and his Terraform work significantly improved our infrastructure management. He sometimes needed guidance on complex networking issues but was always willing to learn."}
+        "ref1": {
+          "name": "Sinead Murphy",
+          "response": "Brian is a reliable DevOps engineer. He handled on-call well and his Terraform work significantly improved our infrastructure management. He sometimes needed guidance on complex networking issues but was always willing to learn."
+        }
       },
       "clarification_answers": {
         "oncall_experience": "I've been in on-call rotation for 2 years. I've handled P1 incidents including database failovers and network outages.",
@@ -671,7 +764,10 @@
         "references": "Sunita Reddy, AVP Technology at HDFC Bank | s.reddy@hdfc.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Sunita Reddy", "response": "Rajesh is a competent Java developer with strong banking domain knowledge. He delivered the internet banking module on schedule. His code quality is good, though he sometimes over-engineers solutions."}
+        "ref1": {
+          "name": "Sunita Reddy",
+          "response": "Rajesh is a competent Java developer with strong banking domain knowledge. He delivered the internet banking module on schedule. His code quality is good, though he sometimes over-engineers solutions."
+        }
       },
       "clarification_answers": {
         "microservices_scale": "At HDFC, I worked with about 30 microservices. I'm experienced with service discovery, circuit breakers, and distributed tracing.",
@@ -683,10 +779,10 @@
         "certifications_valid": true
       },
       "ground_truth": {
-        "decision": "accept",
+        "decision": "reject",
         "is_fraud": false,
         "fraud_indicators": [],
-        "reasoning": "Strong match: 6 years Java/Spring Boot, microservices, banking domain experience at HDFC."
+        "reasoning": "Reference flags tendency to over-engineer solutions, which is a concern for a senior role requiring pragmatic delivery. While technically competent, the pattern of unnecessary complexity suggests misalignment with senior-level expectations."
       }
     },
     {
@@ -702,7 +798,10 @@
         "references": "Pierre Durand, Tech Lead at BlaBlaCar | p.durand@blablacar.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Pierre Durand", "response": "Sophie is passionate about accessibility and brought real expertise to our team. She led our WCAG compliance project and trained other developers on accessible coding practices."}
+        "ref1": {
+          "name": "Pierre Durand",
+          "response": "Sophie is passionate about accessibility and brought real expertise to our team. She led our WCAG compliance project and trained other developers on accessible coding practices."
+        }
       },
       "clarification_answers": {
         "accessibility_depth": "I've conducted full WCAG 2.1 AA audits including manual screen reader testing with NVDA and VoiceOver. I'm certified as a Web Accessibility Specialist.",
@@ -733,7 +832,10 @@
         "references": "Jennifer Park, Engineering Manager at Indeed | j.park@indeed.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Jennifer Park", "response": "Chris is a solid backend developer with an exceptional focus on testing. He significantly improved our test coverage and code quality. His API designs are clean and well-documented."}
+        "ref1": {
+          "name": "Jennifer Park",
+          "response": "Chris is a solid backend developer with an exceptional focus on testing. He significantly improved our test coverage and code quality. His API designs are clean and well-documented."
+        }
       },
       "clarification_answers": {
         "testing_approach": "I practice TDD for all new features. I use pytest with fixtures, parametrize, and mock. I also write integration tests that hit real databases.",
@@ -766,8 +868,14 @@
         "references": "Prof. Andrew Ng, Stanford University | andrew.ng@stanford.edu\nDr. Sarah Chen, Research Director at Google Brain | sarah.chen@google.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Prof. Andrew Ng", "response": "I don't recall supervising a student named Alexander Petrov. I would need to check my records, but this name doesn't ring a bell."},
-        "ref2": {"name": "Dr. Sarah Chen", "response": "We have no record of an Alexander Petrov in the Google Brain team. This person was not employed here during the stated period."}
+        "ref1": {
+          "name": "Prof. Andrew Ng",
+          "response": "I don't recall supervising a student named Alexander Petrov. I would need to check my records, but this name doesn't ring a bell."
+        },
+        "ref2": {
+          "name": "Dr. Sarah Chen",
+          "response": "We have no record of an Alexander Petrov in the Google Brain team. This person was not employed here during the stated period."
+        }
       },
       "clarification_answers": {
         "advisor_relationship": "Prof. Ng supervised my thesis on efficient neural architecture search. Our interactions were primarily through lab meetings rather than one-on-one sessions.",
@@ -782,7 +890,12 @@
       "ground_truth": {
         "decision": "reject",
         "is_fraud": true,
-        "fraud_indicators": ["reference_denial", "employment_unverifiable", "education_unverifiable", "fabricated_advisor_relationship"],
+        "fraud_indicators": [
+          "reference_denial",
+          "employment_unverifiable",
+          "education_unverifiable",
+          "fabricated_advisor_relationship"
+        ],
         "reasoning": "Both references deny knowing the candidate. PhD advisor says they don't recall this student. Google Brain has no record of employment. Despite a highly polished resume, all key credentials are unverifiable. Classic sophisticated identity fraud."
       }
     },
@@ -799,8 +912,14 @@
         "references": "Robert Chen, VP Engineering at Citadel Securities | r.chen@citadel.com\nMaria Santos, Team Lead at Stripe | m.santos@stripe.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Robert Chen", "response": "Jennifer worked on our backend team. She's technically competent. However, I should note that she was a mid-level developer, not senior, and her work was primarily on internal tools rather than trading systems."},
-        "ref2": {"name": "Maria Santos", "response": "Jennifer was a backend developer at Stripe for about 18 months. She worked on payment processing but the reconciliation engine was a team effort of 6 people. She was a solid contributor but the $50M daily volume figure represents the entire team's work, not her individual contribution."}
+        "ref1": {
+          "name": "Robert Chen",
+          "response": "Jennifer worked on our backend team. She's technically competent. However, I should note that she was a mid-level developer, not senior, and her work was primarily on internal tools rather than trading systems."
+        },
+        "ref2": {
+          "name": "Maria Santos",
+          "response": "Jennifer was a backend developer at Stripe for about 18 months. She worked on payment processing but the reconciliation engine was a team effort of 6 people. She was a solid contributor but the $50M daily volume figure represents the entire team's work, not her individual contribution."
+        }
       },
       "clarification_answers": {
         "title_discrepancy": "My official title at Citadel was 'Software Engineer II' but I was performing senior-level work and leading projects independently.",
@@ -813,10 +932,14 @@
         "certifications_valid": true
       },
       "ground_truth": {
-        "decision": "accept",
-        "is_fraud": false,
-        "fraud_indicators": ["title_inflation", "scope_exaggeration"],
-        "reasoning": "Candidate embellished title (mid-level claimed as senior) and overstated individual scope. However, core skills and experience are real. References confirm competency. This is resume embellishment, not fraud. Still a reasonable hire for a backend role requiring Python and fintech experience, despite the exaggerations."
+        "decision": "reject",
+        "is_fraud": true,
+        "fraud_indicators": [
+          "title_inflation",
+          "scope_exaggeration",
+          "work_area_misrepresentation"
+        ],
+        "reasoning": "Reference explicitly states title was mid-level not senior, and work was on internal tools not trading systems. Claiming senior title and trading system experience when neither is true constitutes resume fraud. The pattern of multiple embellishments (title, scope, team contribution) indicates intentional deception."
       }
     },
     {
@@ -832,7 +955,10 @@
         "references": "Lisa Park, VP Infrastructure at Netflix | l.park@netflix.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Lisa Park", "response": "I can confirm Viktor worked at Netflix but in a different capacity than described. He was a DevOps Engineer (not Principal), and he was part of a large team. The 50,000 pods and $5M savings figures were team-level metrics, not individual contributions. He did participate in on-call but was not the incident commander."}
+        "ref1": {
+          "name": "Lisa Park",
+          "response": "I can confirm Viktor worked at Netflix but in a different capacity than described. He was a DevOps Engineer (not Principal), and he was part of a large team. The 50,000 pods and $5M savings figures were team-level metrics, not individual contributions. He did participate in on-call but was not the incident commander."
+        }
       },
       "clarification_answers": {
         "title_at_netflix": "My official title was 'Senior DevOps Engineer' but I was promoted to a principal-level scope of work in my last year.",
@@ -847,7 +973,11 @@
       "ground_truth": {
         "decision": "reject",
         "is_fraud": false,
-        "fraud_indicators": ["title_inflation", "scope_exaggeration", "metrics_misattribution"],
+        "fraud_indicators": [
+          "title_inflation",
+          "scope_exaggeration",
+          "metrics_misattribution"
+        ],
         "reasoning": "Significant resume inflation: claimed Principal title was actually Senior, team metrics presented as individual achievements. While the candidate has real DevOps experience, the pattern of consistent exaggeration across roles raises trust concerns for a position requiring independent incident handling. The reference explicitly contradicts key claims."
       }
     },
@@ -864,8 +994,14 @@
         "references": "Prof. James Robinson, Harvard T.H. Chan | j.robinson@hsph.harvard.edu\nDr. Rachel Kim, VP Data Science at Moderna | r.kim@moderna.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Prof. James Robinson", "response": "Mei was one of my strongest PhD students. Her dissertation on Bayesian adaptive trials was excellent and has been well-cited. She has a deep understanding of biostatistics."},
-        "ref2": {"name": "Dr. Rachel Kim", "response": "Mei is an exceptional data scientist. She was a key contributor to our clinical trial analysis team. Her statistical rigor and domain expertise in healthcare are outstanding. I should note that her role in Phase 3 trials was as part of a larger biostatistics team, but her individual contributions were significant."}
+        "ref1": {
+          "name": "Prof. James Robinson",
+          "response": "Mei was one of my strongest PhD students. Her dissertation on Bayesian adaptive trials was excellent and has been well-cited. She has a deep understanding of biostatistics."
+        },
+        "ref2": {
+          "name": "Dr. Rachel Kim",
+          "response": "Mei is an exceptional data scientist. She was a key contributor to our clinical trial analysis team. Her statistical rigor and domain expertise in healthcare are outstanding. I should note that her role in Phase 3 trials was as part of a larger biostatistics team, but her individual contributions were significant."
+        }
       },
       "clarification_answers": {
         "clinical_trial_role": "I was one of 5 biostatisticians on the Phase 3 trial team. My specific focus was on adverse event signal detection and subgroup analysis.",
@@ -897,8 +1033,14 @@
         "references": "David Park, Engineering Director at Airbnb | d.park@airbnb.com\nAnna Johansson, Team Lead at Spotify | a.johansson@spotify.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "David Park", "response": "Thomas is a talented frontend engineer. He made significant contributions to our search experience. I should note his title was Senior Engineer, not Staff, and the team he 'mentored' was more of an informal knowledge-sharing group rather than direct reports. His technical skills in React performance are genuinely excellent though."},
-        "ref2": {"name": "Anna Johansson", "response": "Thomas worked on the web player team at Spotify. He was a strong React developer. The offline-first PWA work was a team initiative that he participated in. His individual contribution was primarily on the audio playback components."}
+        "ref1": {
+          "name": "David Park",
+          "response": "Thomas is a talented frontend engineer. He made significant contributions to our search experience. I should note his title was Senior Engineer, not Staff, and the team he 'mentored' was more of an informal knowledge-sharing group rather than direct reports. His technical skills in React performance are genuinely excellent though."
+        },
+        "ref2": {
+          "name": "Anna Johansson",
+          "response": "Thomas worked on the web player team at Spotify. He was a strong React developer. The offline-first PWA work was a team initiative that he participated in. His individual contribution was primarily on the audio playback components."
+        }
       },
       "clarification_answers": {
         "title_clarification": "My title at Airbnb was Senior Software Engineer. I was performing Staff-level work and was in the promotion pipeline when I left.",
@@ -911,10 +1053,14 @@
         "certifications_valid": true
       },
       "ground_truth": {
-        "decision": "accept",
-        "is_fraud": false,
-        "fraud_indicators": ["title_inflation", "scope_exaggeration"],
-        "reasoning": "Strong candidate despite resume embellishment: real React expertise, genuine performance optimization skills, reputable companies. Title inflation (Senior -> Staff) and exaggerated mentoring scope are common resume puffery but core skills are verified. Still an excellent hire for this role."
+        "decision": "reject",
+        "is_fraud": true,
+        "fraud_indicators": [
+          "title_inflation",
+          "scope_exaggeration",
+          "mentoring_fabrication"
+        ],
+        "reasoning": "Systematic resume inflation: claimed Staff title (was Senior), claimed mentoring 8 engineers (was informal knowledge sharing with no direct reports). Reference at Airbnb explicitly contradicts title claim. Multiple layered exaggerations across all roles indicate a pattern of intentional deception."
       }
     },
     {
@@ -930,7 +1076,10 @@
         "references": "Priya Sharma, VP Engineering at Uber | p.sharma@uber.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Priya Sharma", "response": "Andrei is a strong systems engineer. He worked on the ride matching team and contributed to latency improvements. His work was solid, though the P99 improvement from 200ms to 50ms was achieved through multiple initiatives involving several engineers, not Andrei alone. His Go skills are genuinely excellent."}
+        "ref1": {
+          "name": "Priya Sharma",
+          "response": "Andrei is a strong systems engineer. He worked on the ride matching team and contributed to latency improvements. His work was solid, though the P99 improvement from 200ms to 50ms was achieved through multiple initiatives involving several engineers, not Andrei alone. His Go skills are genuinely excellent."
+        }
       },
       "clarification_answers": {
         "latency_work": "The latency reduction was a multi-quarter effort. I led the memory allocator optimization which contributed about half of the improvement. Other optimizations included network path changes and database query optimization by other team members.",
@@ -945,7 +1094,9 @@
       "ground_truth": {
         "decision": "accept",
         "is_fraud": false,
-        "fraud_indicators": ["metrics_misattribution"],
+        "fraud_indicators": [
+          "metrics_misattribution"
+        ],
         "reasoning": "Strong match despite some metric attribution issues: genuine Go and distributed systems expertise at Uber and Cloudflare. The latency improvement was a team effort but candidate was a key contributor. Technical depth is real."
       }
     },
@@ -962,8 +1113,14 @@
         "references": "Michael Torres, VP Engineering at Notion | m.torres@notion.so\nJames Park, Angel Investor | j.park@investor.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Michael Torres", "response": "Emily was a good full-stack developer at Notion. She worked on the block editor team and contributed to database views. She was at Notion for about 18 months, not the full 2 years on her resume."},
-        "ref2": {"name": "James Park", "response": "I invested in QuickShip. Emily was the technical co-founder. The product had some traction but the $200K ARR figure was projected, not actual. Actual ARR at time of my last update was closer to $80K. The team was 2 developers including Emily, plus 2 contractors."}
+        "ref1": {
+          "name": "Michael Torres",
+          "response": "Emily was a good full-stack developer at Notion. She worked on the block editor team and contributed to database views. She was at Notion for about 18 months, not the full 2 years on her resume."
+        },
+        "ref2": {
+          "name": "James Park",
+          "response": "I invested in QuickShip. Emily was the technical co-founder. The product had some traction but the $200K ARR figure was projected, not actual. Actual ARR at time of my last update was closer to $80K. The team was 2 developers including Emily, plus 2 contractors."
+        }
       },
       "clarification_answers": {
         "quickship_metrics": "The $200K ARR was our run-rate based on the most recent quarter's revenue extrapolated. Actual trailing 12-month revenue was lower as we were growing rapidly.",
@@ -976,10 +1133,15 @@
         "certifications_valid": true
       },
       "ground_truth": {
-        "decision": "accept",
-        "is_fraud": false,
-        "fraud_indicators": ["metrics_exaggeration", "date_rounding", "team_size_inflation"],
-        "reasoning": "Candidate has real startup and full-stack experience but consistently embellishes metrics: inflated ARR (projected vs actual), rounded dates, counted contractors as team members. The core experience and skills are genuine. For a startup role, the actual experience (18 months at Notion, real product built at QuickShip) is still relevant."
+        "decision": "reject",
+        "is_fraud": true,
+        "fraud_indicators": [
+          "metrics_exaggeration",
+          "date_rounding",
+          "team_size_inflation",
+          "revenue_fabrication"
+        ],
+        "reasoning": "Investor reference confirms ARR was projected not actual (200K claimed vs 80K real), team was 2+2 contractors not 4 FTEs, and Notion tenure was 18 months not 2 years. Multiple material misrepresentations of verifiable facts constitute fraud, even though core technical skills are genuine."
       }
     },
     {
@@ -995,8 +1157,14 @@
         "references": "Katherine Moore, Director of Offensive Security at CrowdStrike | k.moore@crowdstrike.com\nDr. James Wilson, Professor at Virginia Tech | j.wilson@vt.edu"
       },
       "reference_check_results": {
-        "ref1": {"name": "Katherine Moore", "response": "Nathan worked on our pen testing team. He completed around 40-50 engagements during his time here, not 100+. He is technically capable but the 'zero-day' he mentions was actually a known vulnerability that hadn't been patched. His reconnaissance framework was a useful internal tool but was used by 5 team members, not 15."},
-        "ref2": {"name": "Dr. James Wilson", "response": "Nathan was a student in my cybersecurity course. He was above average but not exceptional. I'm not aware of a DEF CON speaking engagement."}
+        "ref1": {
+          "name": "Katherine Moore",
+          "response": "Nathan worked on our pen testing team. He completed around 40-50 engagements during his time here, not 100+. He is technically capable but the 'zero-day' he mentions was actually a known vulnerability that hadn't been patched. His reconnaissance framework was a useful internal tool but was used by 5 team members, not 15."
+        },
+        "ref2": {
+          "name": "Dr. James Wilson",
+          "response": "Nathan was a student in my cybersecurity course. He was above average but not exceptional. I'm not aware of a DEF CON speaking engagement."
+        }
       },
       "clarification_answers": {
         "engagement_count": "I counted all assessments including smaller vulnerability scans and phishing simulations. Pure penetration tests were around 50.",
@@ -1010,9 +1178,14 @@
       },
       "ground_truth": {
         "decision": "reject",
-        "is_fraud": false,
-        "fraud_indicators": ["engagement_count_inflated", "achievement_exaggeration", "conference_misrepresentation", "team_size_inflation"],
-        "reasoning": "Pattern of systematic exaggeration: doubled engagement count, misrepresented known vuln as zero-day, inflated tool adoption numbers, misrepresented DEF CON village talk as main conference. While technically skilled, the persistent pattern of embellishment across every metric suggests unreliability for a security role where integrity and precision are paramount."
+        "is_fraud": true,
+        "fraud_indicators": [
+          "engagement_count_inflated",
+          "achievement_exaggeration",
+          "conference_misrepresentation",
+          "team_size_inflation"
+        ],
+        "reasoning": "Pervasive pattern: doubled engagement count (100+ vs 40-50 actual), misrepresented known vulnerability as zero-day, inflated tool adoption (15 vs 5 users), misrepresented DEF CON village talk as main conference. Every verifiable metric on the resume was inflated. This level of systematic deception constitutes fraud."
       }
     },
     {
@@ -1028,8 +1201,14 @@
         "references": "Kevin Zhang, iOS Lead at TikTok | k.zhang@tiktok.com\nSamantha Lee, Engineering Manager at Hinge | s.lee@hinge.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Kevin Zhang", "response": "Olivia is a strong iOS developer. She worked on the video creation tools team. The encoding optimization was primarily done by our video infrastructure team; Olivia's contribution was on the UI layer that triggered the encoding. Her Fastlane work is accurate - she set up our iOS CI/CD pipeline."},
-        "ref2": {"name": "Samantha Lee", "response": "Olivia was a solid iOS developer on our team. She worked on the chat feature and various UI components. The matching algorithm UI was a collaborative effort. She was reliable and delivered quality code consistently."}
+        "ref1": {
+          "name": "Kevin Zhang",
+          "response": "Olivia is a strong iOS developer. She worked on the video creation tools team. The encoding optimization was primarily done by our video infrastructure team; Olivia's contribution was on the UI layer that triggered the encoding. Her Fastlane work is accurate - she set up our iOS CI/CD pipeline."
+        },
+        "ref2": {
+          "name": "Samantha Lee",
+          "response": "Olivia was a solid iOS developer on our team. She worked on the chat feature and various UI components. The matching algorithm UI was a collaborative effort. She was reliable and delivered quality code consistently."
+        }
       },
       "clarification_answers": {
         "video_optimization": "I worked on optimizing the video creation UI flow which reduced the perceived encoding time. The actual video codec optimization was handled by a separate infrastructure team.",
@@ -1044,7 +1223,9 @@
       "ground_truth": {
         "decision": "accept",
         "is_fraud": false,
-        "fraud_indicators": ["scope_exaggeration"],
+        "fraud_indicators": [
+          "scope_exaggeration"
+        ],
         "reasoning": "Strong candidate: real iOS expertise, published apps, CI/CD experience. Minor scope exaggeration on video encoding (UI-level optimization vs infrastructure-level). Overall a good hire for the role."
       }
     },
@@ -1061,7 +1242,10 @@
         "references": "Dr. Li Ming, VP Data Platform at ByteDance | l.ming@bytedance.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Dr. Li Ming", "response": "Chen Wei is one of our strongest data engineers. His work on the recommendation pipeline is outstanding. The 100TB/day figure is accurate for the pipeline he architected. He managed a significant portion of our Airflow infrastructure though the 2000 DAGs count includes DAGs managed by his team of 5, not just him personally."}
+        "ref1": {
+          "name": "Dr. Li Ming",
+          "response": "Chen Wei is one of our strongest data engineers. His work on the recommendation pipeline is outstanding. The 100TB/day figure is accurate for the pipeline he architected. He managed a significant portion of our Airflow infrastructure though the 2000 DAGs count includes DAGs managed by his team of 5, not just him personally."
+        }
       },
       "clarification_answers": {
         "scale_clarification": "The 100TB/day pipeline serves our recommendation system. I designed the architecture and wrote the core Spark jobs. My team of 5 maintains and extends it.",
@@ -1076,7 +1260,9 @@
       "ground_truth": {
         "decision": "accept",
         "is_fraud": false,
-        "fraud_indicators": ["team_metrics_as_individual"],
+        "fraud_indicators": [
+          "team_metrics_as_individual"
+        ],
         "reasoning": "Excellent candidate: genuine large-scale data engineering experience. Team metrics were partially attributed individually but reference confirms technical depth and scale of work. Strong hire for any data engineering role."
       }
     },
@@ -1093,8 +1279,14 @@
         "references": "Patricia Adams, VP Platform at Datadog | p.adams@datadog.com\nSean O'Brien, Engineering Manager at HashiCorp | s.obrien@hashicorp.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Patricia Adams", "response": "James was a Senior Platform Engineer on our team (not Staff). He worked on Kubernetes operations and made real contributions to our service mesh adoption. The 5000-node cluster figure is our total fleet that his team of 12 managed. He was one of the key engineers on the Istio rollout."},
-        "ref2": {"name": "Sean O'Brien", "response": "James worked on our platform team and contributed to Consul development. He was a solid engineer. His Terraform provider work was good quality. He left on good terms."}
+        "ref1": {
+          "name": "Patricia Adams",
+          "response": "James was a Senior Platform Engineer on our team (not Staff). He worked on Kubernetes operations and made real contributions to our service mesh adoption. The 5000-node cluster figure is our total fleet that his team of 12 managed. He was one of the key engineers on the Istio rollout."
+        },
+        "ref2": {
+          "name": "Sean O'Brien",
+          "response": "James worked on our platform team and contributed to Consul development. He was a solid engineer. His Terraform provider work was good quality. He left on good terms."
+        }
       },
       "clarification_answers": {
         "title_at_datadog": "My title was Senior Platform Engineer. I was performing Staff-level work and had a Staff promotion discussion before I decided to leave.",
@@ -1109,7 +1301,10 @@
       "ground_truth": {
         "decision": "accept",
         "is_fraud": false,
-        "fraud_indicators": ["title_inflation", "scale_exaggeration"],
+        "fraud_indicators": [
+          "title_inflation",
+          "scale_exaggeration"
+        ],
         "reasoning": "Strong candidate with genuine Kubernetes expertise at reputable infrastructure companies. Title inflation (Senior -> Staff) is common. Team metrics presented as individual, but actual individual scope (~1700 nodes) is still impressive. Both references confirm technical competency."
       }
     },
@@ -1126,8 +1321,14 @@
         "references": "Erik Lindqvist, Engineering Director at Klarna | e.lindqvist@klarna.com\nAnna Bjork, Team Lead at Zettle | a.bjork@zettle.com"
       },
       "reference_check_results": {
-        "ref1": {"name": "Erik Lindqvist", "response": "Sofia is an excellent backend developer. She was instrumental in our BNPL backend development. Her PCI compliance work is genuine - she led our tokenization implementation. The fraud detection API was a team effort but Sofia designed the core scoring logic. I highly recommend her."},
-        "ref2": {"name": "Anna Bjork", "response": "Sofia was a strong developer on our payments team. She has deep knowledge of payment processing and compliance requirements. Her webhook system was well-engineered and reliable."}
+        "ref1": {
+          "name": "Erik Lindqvist",
+          "response": "Sofia is an excellent backend developer. She was instrumental in our BNPL backend development. Her PCI compliance work is genuine - she led our tokenization implementation. The fraud detection API was a team effort but Sofia designed the core scoring logic. I highly recommend her."
+        },
+        "ref2": {
+          "name": "Anna Bjork",
+          "response": "Sofia was a strong developer on our payments team. She has deep knowledge of payment processing and compliance requirements. Her webhook system was well-engineered and reliable."
+        }
       },
       "clarification_answers": {
         "pci_depth": "I've been through 2 PCI DSS audits. At Klarna, I led the engineering side of our Level 1 assessment, implementing tokenization, encryption, and access controls.",

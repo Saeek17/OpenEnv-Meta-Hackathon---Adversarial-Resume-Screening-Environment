@@ -135,7 +135,10 @@ class ResumeScreeningEnvironment(Environment[ResumeObservation, ResumeAction, Re
                              feedback=f"Section '{section}' already viewed. No new information.")
 
         self._sections_viewed.append(section)
-        reward = 0.03 if section in HIGH_VALUE_SECTIONS else 0.01
+        # Variable rewards: harder tiers get higher investigation rewards
+        tier_multiplier = {"easy": 1.0, "medium": 1.2, "hard": 1.5}.get(self._task_type, 1.0)
+        base_reward = 0.03 if section in HIGH_VALUE_SECTIONS else 0.01
+        reward = round(base_reward * tier_multiplier, 4)
         self._investigation_score += reward
 
         if remaining <= 0:
@@ -159,12 +162,13 @@ class ResumeScreeningEnvironment(Environment[ResumeObservation, ResumeAction, Re
                 best_score = overlap
                 best_key = key
 
+        tier_multiplier = {"easy": 1.0, "medium": 1.2, "hard": 1.5}.get(self._task_type, 1.0)
         if best_key and best_score > 0:
             response_text = answers[best_key]
-            reward = 0.03
+            reward = round(0.03 * tier_multiplier, 4)
         else:
             response_text = "Thank you for your question. I don't have specific information to address that."
-            reward = 0.01
+            reward = round(0.01 * tier_multiplier, 4)
 
         self._investigation_score += reward
 
@@ -325,8 +329,18 @@ class ResumeScreeningEnvironment(Environment[ResumeObservation, ResumeAction, Re
         return {s: sections[s] for s in self._sections_viewed if s in sections}
 
     def _get_available_actions(self) -> List[str]:
-        actions = ["view_section", "ask_clarification", "check_reference",
-                    "verify_credential", "submit_decision"]
+        actions = []
+        # Only offer view_section if there are unseen sections
+        all_sections = set(self._sample["resume_sections"].keys()) if self._sample else set()
+        unseen = all_sections - set(self._sections_viewed)
+        if unseen:
+            actions.append("view_section")
+        actions.append("ask_clarification")
+        if self._references_checked == 0:
+            actions.append("check_reference")
+        if self._verifications_done == 0:
+            actions.append("verify_credential")
+        actions.append("submit_decision")
         return actions
 
     def _obs(self, reward: float, remaining: int, feedback: str) -> ResumeObservation:
