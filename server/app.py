@@ -44,7 +44,7 @@ async def home():
             <div class="card">
                 <h1>📄 Adversarial Resume Screening</h1>
                 <p>Status: <span class="status">ONLINE</span></p>
-                <p style="font-size: 0.8rem; color: #718096;">Version: v2.0.0</p>
+                <p style="font-size: 0.8rem; color: #718096;">Version: v2.0.2</p>
                 <p>This is an OpenEnv environment for evaluating AI agents.</p>
                 <hr>
                 <p>Endpoints available:</p>
