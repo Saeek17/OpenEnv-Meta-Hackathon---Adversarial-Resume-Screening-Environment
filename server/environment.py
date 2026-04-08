@@ -281,27 +281,34 @@ class ResumeScreeningEnvironment(Environment[ResumeObservation, ResumeAction, Re
         else:
             reward -= 0.25
 
-        # Confidence calibration: +0.10 if confident and both correct
-        if (decision == gt["decision"] and fraud_flag == gt["is_fraud"]
-                and confidence >= 0.7):
-            reward += 0.10
+        # Confidence calibration: continuous scale based on correctness
+        both_correct = (decision == gt["decision"] and fraud_flag == gt["is_fraud"])
+        if both_correct:
+            # Higher confidence when correct = higher reward (scaled 0 to 0.10)
+            reward += round(0.10 * confidence, 4)
+        else:
+            # Higher confidence when wrong = bigger penalty
+            reward -= round(0.05 * confidence, 4)
 
-        # Investigation thoroughness bonus: +0.10 if agent did real investigation
-        investigated = (len(self._sections_viewed) >= 3
-                        and (self._references_checked > 0 or self._verifications_done > 0))
-        if investigated:
-            reward += 0.10
+        # Investigation thoroughness bonus: scaled by depth
+        sections_score = min(len(self._sections_viewed) / 5.0, 1.0)
+        tool_score = min((self._references_checked + self._verifications_done + self._clarifications_asked) / 3.0, 1.0)
+        thoroughness = (sections_score * 0.6 + tool_score * 0.4)
+        reward += round(0.10 * thoroughness, 4)
 
-        # Fraud reasoning quality: +0.10 if reasoning mentions actual indicators
+        # Fraud reasoning quality: partial credit based on indicator matches
         fraud_indicators = gt.get("fraud_indicators", [])
         if fraud_indicators and fraud_reasoning:
             reasoning_lower = fraud_reasoning.lower()
             matched = sum(1 for ind in fraud_indicators if ind.replace("_", " ") in reasoning_lower)
-            if matched > 0:
-                reward += 0.10
+            match_ratio = matched / len(fraud_indicators)
+            reward += round(0.10 * match_ratio, 4)
+        elif not fraud_indicators and not fraud_flag:
+            # Correctly identified non-fraud with no reasoning needed
+            reward += 0.05
 
-        # Early termination penalty: submit on step 1 without investigation
-        if self._step_count == 1 and len(self._sections_viewed) <= 1:
+        # Early termination penalty: scaled by how little was investigated
+        if self._step_count <= 2 and len(self._sections_viewed) <= 1:
             reward -= 0.15
 
         # Clamp to [-1.0, 1.0]
