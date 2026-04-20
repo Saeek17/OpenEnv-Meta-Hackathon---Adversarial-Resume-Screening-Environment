@@ -17,5 +17,5 @@ ENV PYTHONPATH=/app
 # Expose port 7860
 EXPOSE 7860
 
-# Run uvicorn server.app:app
-CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860"]
+# Run the Fleet environment (v3.0.0 — multi-agent hiring fleet)
+CMD ["uvicorn", "server.fleet_app:app", "--host", "0.0.0.0", "--port", "7860"]
