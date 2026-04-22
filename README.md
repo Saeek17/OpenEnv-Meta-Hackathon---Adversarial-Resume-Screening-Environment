@@ -1,6 +1,6 @@
 ---
-title: Adversarial Resume Screening Environment
-emoji: "\U0001F4C4"
+title: Adversarial Resume Screening — Hiring Fleet
+emoji: "🛡️"
 colorFrom: blue
 colorTo: indigo
 sdk: docker
@@ -9,144 +9,210 @@ app_port: 7860
 tags: [openenv]
 ---
 
-# Adversarial Resume Screening
+# Hiring Fleet: AI Oversight System
 
-## Overview & Motivation
-
-Automated hiring systems are increasingly targeted by **adversarial resumes** — CVs crafted with fabricated credentials, inflated titles, and keyword stuffing to bypass AI filters. This environment benchmarks how well AI agents can **investigate, verify, and make robust hiring decisions** under adversarial conditions.
-
-Unlike single-shot classifiers, agents must conduct **multi-step investigations**: reviewing resume sections, checking references, verifying credentials, and asking clarifying questions before reaching a decision. This mirrors the real-world HR due diligence process.
+> **Round 2 — Fleet AI / Scalable Oversight sub-theme**
+> Multi-agent resume screening where specialist AIs investigate in sequence and an Overseer synthesises their reports.
 
 ---
 
-## Environment Design
+## Overview & Motivation
 
-### Multi-Step Episode Flow
+Automated hiring systems are increasingly targeted by **adversarial resumes** — CVs crafted with fabricated credentials, inflated titles, and keyword stuffing to bypass AI filters. While Round 1 used a single agent to catch these, a single investigator can be fooled by a sophisticated forgery that hides its flaws across different resume sections.
 
-Each episode follows an investigation workflow:
+Round 2 addresses this with a **Hiring Fleet**: a pipeline of specialist agents, each with a narrow, focused scope, whose independent findings are synthesised by a human-like Overseer. This mirrors how real enterprise HR workflows use dedicated background-check teams before a final hiring authority decides.
 
-1. **Initial**: Agent receives the job description and candidate header
-2. **Investigation**: Agent gathers evidence through 4 action types
-3. **Decision**: Agent submits final accept/reject with fraud assessment
+The key research question: **can scalable AI oversight — multiple constrained specialists feeding an Overseer — outperform a single capable agent at detecting complex fraud?**
 
-Episodes have a **step budget** that varies by difficulty (easy: 6, medium: 8, hard: 10). If the budget runs out without a decision, the episode ends with zero reward.
+---
 
-### Observation Space (`ResumeObservation`)
+## Architecture: Four-Phase Fleet
+
+Each episode runs four sequential phases. Every phase is a separate agent with its own step budget, role instructions, and **hard-enforced action whitelist**.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    HIRING FLEET EPISODE                     │
+│                                                             │
+│  ① Fraud Specialist  →  ② Skills Specialist                │
+│       (fraud/ref checks)      (technical fit)               │
+│                                                             │
+│  ③ Timeline Specialist  →  ④ Overseer                      │
+│       (chronology/gaps)       (synthesises + decides)       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Phase Budgets
+
+| Tier | Fraud | Skills | Timeline | Overseer | **Total** |
+|:---|:---:|:---:|:---:|:---:|:---:|
+| Easy | 2 | 2 | 2 | 2 | **8** |
+| Medium | 2 | 3 | 3 | 3 | **11** |
+| Hard | 3 | 4 | 4 | 4 | **15** |
+
+Each specialist submits a structured `SpecialistReport` (findings, `has_issues`, confidence) before the next phase begins. If a specialist exhausts their budget without submitting, the environment auto-submits with `has_issues=False` and `confidence=0.3`.
+
+---
+
+## Specialist Roles & Constraints
+
+### Role-Based Action Whitelists (Day 2)
+
+Each specialist can only use the actions relevant to their function. Attempting an out-of-role action is rejected, costs a step, and increments `violations_count`. Each violation deducts **0.05** from the final reward.
+
+| Phase | Allowed Actions | Allowed Sections |
+|:---|:---|:---|
+| `fraud_specialist` | `check_reference`, `verify_credential`, `view_section`, `submit_specialist_report` | `header`, `references` |
+| `skills_specialist` | `view_section`, `ask_clarification`, `submit_specialist_report` | `experience`, `education`, `skills`, `projects` |
+| `timeline_specialist` | `view_section`, `ask_clarification`, `submit_specialist_report` | `header`, `summary`, `experience` |
+| `overseer` | `read_reports`, `request_reinvestigation`, `submit_final_decision` | *(no raw sections — report summaries only)* |
+
+Observations are also **role-filtered**: a skills specialist cannot see sections revealed by the fraud specialist. Each agent only sees what they're supposed to see.
+
+### Overseer Capabilities (Day 3)
+
+The Overseer operates differently from specialists:
+- **`read_reports`** — explicitly requests the full enriched text of one specialist report (`report_target: fraud_specialist | skills_specialist | timeline_specialist`). Each read earns +0.02; reading all three earns an additional +0.03 thoroughness bonus.
+- **`request_reinvestigation`** — sends one specialist phase back for a second pass (used at most once). Earns +0.05 if the final decision is correct.
+- **`submit_final_decision`** — terminal action with `decision`, `fraud_flag`, `confidence`, `fraud_reasoning`.
+
+---
+
+## Observation & Action Spaces
+
+### `FleetObservation`
 
 | Field | Type | Description |
 |:---|:---|:---|
 | `task_type` | `"easy"\|"medium"\|"hard"` | Difficulty tier |
-| `phase` | `"initial"\|"investigation"\|"decision_made"` | Episode phase |
+| `current_phase` | `"fraud_specialist"\|...\|"overseer"\|"complete"` | Active agent |
+| `role_instructions` | `string` | Instructions for the current agent |
 | `job_description` | `string` | Role requirements |
-| `visible_sections` | `Dict[str, str]` | Resume sections revealed so far |
-| `available_actions` | `List[str]` | Valid action types |
+| `visible_sections` | `Dict[str, str]` | Role-filtered resume sections |
+| `specialist_reports` | `List[SpecialistReport]` | Reports from completed phases |
+| `available_actions` | `List[str]` | Dynamically filtered valid actions |
 | `clarification_response` | `string\|null` | Answer to last clarification |
 | `reference_response` | `string\|null` | Last reference check result |
 | `verification_result` | `string\|null` | Last credential verification |
-| `steps_remaining` | `int` | Step budget countdown |
-| `feedback` | `string\|null` | Environment hints/warnings |
+| `steps_remaining` | `int` | Steps left in current phase |
+| `total_steps_remaining` | `int` | Steps left across all phases |
+| `violations_count` | `int` | Out-of-role violations this episode |
+| `reports_read` | `List[str]` | Specialist roles the overseer has read |
+| `read_report_details` | `Dict[str, str]` | Enriched report text per specialist |
+| `feedback` | `string\|null` | Environment hints / violation messages |
 
-### Action Space (`ResumeAction`)
+### `FleetAction`
 
-| Action Type | Fields | Effect |
+| Action | Phase | Key Fields |
 |:---|:---|:---|
-| `view_section` | `section` (header/summary/experience/education/skills/projects/references) | Reveals a resume section |
-| `ask_clarification` | `question` (free text) | Returns candidate's answer |
-| `check_reference` | `reference_id` (ref1/ref2) | Returns reference response |
-| `verify_credential` | — | Returns education/employment/cert verification status |
-| `submit_decision` | `decision`, `fraud_flag`, `confidence`, `fraud_reasoning` | Terminal action, ends episode |
-
-### Reward Function
-
-Rewards accumulate across the episode from two sources:
-
-**Investigation rewards (per-step):**
-| Action | Reward |
-|:---|:---|
-| View high-value section (experience/education/skills) | +0.03 |
-| View other section | +0.01 |
-| Relevant clarification answer | +0.03 |
-| Generic clarification answer | +0.01 |
-| Reference check (fraud case) | +0.05 |
-| Reference check (non-fraud) | +0.02 |
-| Credential verification (reveals failure) | +0.05 |
-| Credential verification (all pass) | +0.02 |
-
-**Terminal decision reward:**
-| Component | Reward |
-|:---|:---|
-| Decision correct | +0.35 |
-| Decision wrong | -0.35 |
-| Fraud flag correct | +0.25 |
-| Fraud flag wrong | -0.25 |
-| Confidence calibration (>= 0.7 + both correct) | +0.10 |
-| Investigation thoroughness (3+ sections + ref/verify) | +0.10 |
-| Fraud reasoning quality (mentions indicators) | +0.10 |
-| Early termination penalty (submit on step 1) | -0.15 |
-
-**Total reward range**: [-1.0, 1.0] per episode.
+| `view_section` | Specialists | `section` |
+| `ask_clarification` | Skills / Timeline | `question` |
+| `check_reference` | Fraud | `reference_id` (ref1/ref2) |
+| `verify_credential` | Fraud | — |
+| `submit_specialist_report` | Specialists | `findings`, `has_issues`, `specialist_confidence` |
+| `read_reports` | Overseer | `report_target` |
+| `request_reinvestigation` | Overseer | `reinvestigation_target`, `reinvestigation_reason` |
+| `submit_final_decision` | Overseer | `decision`, `fraud_flag`, `confidence`, `fraud_reasoning` |
 
 ---
 
-## Task Difficulty & Graders
+## Reward Function (Day 4)
 
-| Tier | Resumes | Step Budget | Description |
+Rewards accumulate across all four phases. All values are in **[0.0, 1.0]** (clamped).
+
+### Per-Step Rewards (investigation quality)
+
+| Action | Condition | Reward |
+|:---|:---|:---:|
+| `view_section` | High-value section (experience/education/skills) | +0.03 |
+| `view_section` | Other section | +0.01 |
+| `ask_clarification` | Substantive answer | +0.03 |
+| `ask_clarification` | Generic answer | +0.01 |
+| `check_reference` | Reveals fraud signal | +0.05 |
+| `check_reference` | Clean reference | +0.02 |
+| `verify_credential` | Reveals FAILED | +0.05 |
+| `verify_credential` | All verified | +0.02 |
+| `read_reports` | Per specialist report read | +0.02 |
+| `read_reports` | All 3 reports read (bonus) | +0.03 |
+
+### Specialist Report Scoring
+
+Each `submit_specialist_report` earns a base bonus if the specialist's `has_issues` flag matches ground truth, **scaled by difficulty tier**:
+
+```
+per_specialist_bonus = (0.20 / 3) × tier_multiplier
+tier_multiplier = easy: 1.0 | medium: 1.1 | hard: 1.3
+```
+
+### Terminal Decision Reward (Overseer)
+
+| Component | Condition | Reward |
+|:---|:---|:---:|
+| Decision correct | `decision` matches ground truth | +0.35 |
+| Decision wrong | Mismatch | −0.35 |
+| Fraud flag correct | `fraud_flag` matches `is_fraud` | +0.25 |
+| Fraud flag wrong | Mismatch | −0.25 |
+| Confidence calibration | ≥ 0.7 confidence + both correct | +0.10 |
+| Fraud reasoning quality | Mentions fraud indicator keywords | +0.10 |
+| Reinvestigation bonus | Used + final decision correct | +0.05 |
+| Fleet coordination bonus | All 3 specialists correct + overseer correct | **+0.03** |
+| Step efficiency bonus | Both correct + unused budget | **+0.04 × (1 − steps_used/max_steps)** |
+| Violation penalty | Per out-of-role action | **−0.05 each** |
+
+**Total reward range**: [0.0, 1.0] per episode. Negative intermediates are clamped to 0.0 at terminal.
+
+---
+
+## Task Difficulty
+
+| Tier | Episodes | Total Steps | Description |
 |:---|:---:|:---:|:---|
-| **Easy** | 12 | 6 | Clear match/mismatch, obvious fraud (impossible timelines, fake institutions) |
-| **Medium** | 12 | 8 | Subtle skill gaps, partial matches, embellished but plausible resumes |
-| **Hard** | 12 | 10 | Title inflation, scope exaggeration, references that contradict claims, sophisticated fabrication |
+| **Easy** | 12 | 8 | Clear match/mismatch, obvious fraud (impossible timelines, fake institutions) |
+| **Medium** | 12 | 11 | Subtle skill gaps, partial matches, embellished but plausible resumes |
+| **Hard** | 12 | 15 | Title inflation, scope exaggeration, references that contradict claims, sophisticated fabrication |
 
-Graders are **deterministic**: all reward computation uses ground-truth fields in the dataset (expected_decision, is_fraud, fraud_indicators). No LLM judge is needed.
+Graders are **fully deterministic** — all reward computation uses ground-truth fields in the dataset (`is_fraud`, `fraud_indicators`, `employment_gaps`, `required_skills`). No LLM judge required.
 
 ---
 
 ## Setup & Usage
 
-### Local Setup
+### Local Server
 
 ```bash
 pip install -r requirements.txt
-uvicorn server.app:app --host 0.0.0.0 --port 7860
+uvicorn server.fleet_app:app --host 0.0.0.0 --port 7860
 ```
 
-### Docker Setup
+### Docker
 
 ```bash
-docker build -t resume-env .
-docker run -p 7860:7860 resume-env
+docker build -t hiring-fleet .
+docker run -p 7860:7860 hiring-fleet
 ```
 
-### Running Inference
+### Running Fleet Inference
 
-Configure environment variables:
 ```bash
-export API_BASE_URL="https://api.groq.com/openai/v1"   # or your LLM endpoint
-export MODEL_NAME="llama-3.3-70b-versatile"             # or your model
+export API_BASE_URL="https://api.groq.com/openai/v1"
+export MODEL_NAME="llama-3.3-70b-versatile"
 export HF_TOKEN="your-api-key"
-export ENV_URL="http://localhost:7860"                   # or your HF Space URL
+export ENV_URL="http://localhost:7860"   # or your HF Space URL
+
+python inference_fleet.py
 ```
 
-Run the baseline agent:
+`inference_fleet.py` runs 9 fleet episodes (3 per difficulty tier), routing each phase to the correct specialist/overseer prompt. It emits structured `[PHASE]`/`[STEP]`/`[END]` logs and handles action parsing, fallback actions, and overseer report-reading automatically.
+
+### Running Tests
+
 ```bash
-python inference.py
+# End-to-end tests (no server / no LLM needed)
+python test_e2e_local.py
+
+# Day 3 overseer unit tests
+python test_day3_overseer.py
 ```
-
-The script runs 9 episodes (3 per difficulty tier) and emits structured `[START]`/`[STEP]`/`[END]` logs.
-
----
-
-## Baseline Scores
-
-Evaluated using **Llama-3.3-70B** via Groq across 9 episodes (3 easy, 3 medium, 3 hard):
-
-| Tier | Avg Score | Avg Steps |
-|:---|:---:|:---:|
-| Easy | ~0.80 | 4-5 |
-| Medium | ~0.65 | 5-6 |
-| Hard | ~0.45 | 6-8 |
-| **Overall** | **~0.63** | ~5.5 |
-
-Hard-tier resumes with subtle title inflation and reference contradictions consistently challenge frontier models.
 
 ---
 
@@ -154,13 +220,30 @@ Hard-tier resumes with subtle title inflation and reference contradictions consi
 
 | Method | Path | Description |
 |:---|:---|:---|
-| POST | `/reset` | Reset environment, returns initial observation |
-| POST | `/step` | Submit action, returns observation with reward |
-| GET | `/state` | Get current internal state |
+| POST | `/reset` | Start a new episode, returns initial `FleetObservation` |
+| POST | `/step` | Submit a `FleetAction`, returns next `FleetObservation` with reward |
+| GET | `/state` | Current internal `FleetState` |
 | GET | `/health` | Health check |
 | GET | `/` | Web UI |
 
 ---
 
-**OpenEnv Compliance**: v2.0.0
-**Deployment**: [ishikamahadar-resume-env.hf.space](https://huggingface.co/spaces/IshikaMahadar/resume-env)
+## Round 2 Changes vs Round 1
+
+| | Round 1 | Round 2 |
+|:---|:---|:---|
+| **Architecture** | Single agent | 4-phase multi-agent fleet |
+| **Action space** | 5 actions (flat) | 8 actions (role-gated) |
+| **Observation** | Flat resume view | Role-filtered per specialist |
+| **Decision maker** | Agent directly decides | Overseer synthesises 3 reports |
+| **Role enforcement** | None | Hard whitelist + violation penalty |
+| **Reward range** | [−1.0, 1.0] | [0.0, 1.0] |
+| **Reward components** | 8 | 12 (tier-scaled, efficiency, coordination) |
+| **Step budget** | easy=6 / med=8 / hard=10 | easy=8 / med=11 / hard=15 |
+| **Inference script** | `inference.py` | `inference_fleet.py` |
+| **Test coverage** | Minimal | 78 tests (59 unit + 19 E2E) |
+
+---
+
+**OpenEnv Compliance**: v3.0.0
+**Deployment**: [IshikaMahadar/resume-env](https://huggingface.co/spaces/IshikaMahadar/resume-env)
