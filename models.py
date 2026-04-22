@@ -194,6 +194,21 @@ class FleetObservation(Observation):
     violations_count: int = Field(
         0, description="Number of out-of-role action violations this episode. Each costs 0.05 from final reward."
     )
+    # Day 3 — Overseer report-reading tracking
+    reports_read: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Specialist roles whose reports the overseer has explicitly read via read_reports. "
+            "Reading all three before deciding earns a thoroughness bonus."
+        )
+    )
+    read_report_details: Dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Enriched report text keyed by specialist role. "
+            "Populated progressively as the overseer uses read_reports."
+        )
+    )
     feedback: Optional[str] = Field(
         None, description="Environment feedback for the current agent."
     )
@@ -213,6 +228,7 @@ class FleetAction(Action):
         "check_reference",
         "verify_credential",
         "submit_specialist_report",
+        "read_reports",
         "request_reinvestigation",
         "submit_final_decision"
     ] = Field(..., description="Type of action to take.")
@@ -236,6 +252,15 @@ class FleetAction(Action):
     # For check_reference
     reference_id: Optional[str] = Field(
         None, description="Reference to contact: ref1 or ref2."
+    )
+
+    # For read_reports (overseer only — Day 3)
+    report_target: Optional[str] = Field(
+        None,
+        description=(
+            "Which specialist report to read in full: "
+            "'fraud_specialist', 'skills_specialist', or 'timeline_specialist'."
+        )
     )
 
     # For submit_specialist_report
@@ -287,6 +312,15 @@ class FleetState(State):
     clarifications_asked: int = Field(0)
     reinvestigation_used: bool = Field(False, description="Whether overseer requested reinvestigation.")
     violations_count: int = Field(0, description="Out-of-role action violations this episode.")
+    # Day 3 — Overseer report reading
+    reports_read: List[str] = Field(
+        default_factory=list,
+        description="Specialist roles whose reports the overseer has explicitly read."
+    )
+    read_report_details: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Enriched detail text per specialist role, populated by read_reports action."
+    )
     done: bool = Field(False)
 
 

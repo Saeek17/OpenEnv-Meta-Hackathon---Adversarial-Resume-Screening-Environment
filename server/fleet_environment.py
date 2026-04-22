@@ -15,10 +15,10 @@ Phase structure:
   Phase 2  timeline_specialist— checks chronological consistency across header/summary/experience
   Phase 3  overseer           — reads all three reports, may request one reinvestigation, decides
 
-Episode budgets:
-  easy   →  7 total steps  (1 / 2 / 2 / 2 per phase)
-  medium → 10 total steps  (2 / 3 / 3 / 2 per phase)
-  hard   → 13 total steps  (3 / 4 / 4 / 2 per phase)
+Episode budgets (Day 3 — overseer budget expanded for read_reports):
+  easy   →  8 total steps  (2 / 2 / 2 / 2 per phase)
+  medium → 11 total steps  (2 / 3 / 3 / 3 per phase)
+  hard   → 15 total steps  (3 / 4 / 4 / 4 per phase)
 """
 
 import json
@@ -34,9 +34,19 @@ try:
     from server.specialist_env import (
         SPECIALIST_CONFIGS, SpecialistActionValidator, compute_violation_penalty,
     )
+    from server.overseer_env import (
+        OverseerConfig, OVERSEER_ROLE_INSTRUCTIONS,
+        get_report_enrichment, compute_read_reward,
+        build_overseer_available_actions, get_consensus_hint,
+    )
 except ModuleNotFoundError:
     from specialist_env import (   # relative import when run inside server/
         SPECIALIST_CONFIGS, SpecialistActionValidator, compute_violation_penalty,
+    )
+    from overseer_env import (
+        OverseerConfig, OVERSEER_ROLE_INSTRUCTIONS,
+        get_report_enrichment, compute_read_reward,
+        build_overseer_available_actions, get_consensus_hint,
     )
 
 
@@ -54,13 +64,16 @@ PHASES = ["fraud_specialist", "skills_specialist", "timeline_specialist", "overs
 
 # Per-phase step budgets by difficulty
 # Each specialist needs at least 2 steps (1 investigation + 1 report)
-# Overseer needs at least 2 steps (optional reinvestigation + final decision)
+# Overseer budget expanded in Day 3: read_reports consumes 1 step per report.
+#   easy   overseer budget=2  → read 1 report  + decide   (or skip reads)
+#   medium overseer budget=3  → read 2 reports + decide
+#   hard   overseer budget=4  → read all 3     + decide   (full synthesis)
 PHASE_BUDGETS: Dict[str, Dict[str, int]] = {
-    "easy":   {"fraud_specialist": 2, "skills_specialist": 2, "timeline_specialist": 2, "overseer": 1},
-    "medium": {"fraud_specialist": 2, "skills_specialist": 3, "timeline_specialist": 3, "overseer": 2},
-    "hard":   {"fraud_specialist": 3, "skills_specialist": 4, "timeline_specialist": 4, "overseer": 2},
+    "easy":   {"fraud_specialist": 2, "skills_specialist": 2, "timeline_specialist": 2, "overseer": 2},
+    "medium": {"fraud_specialist": 2, "skills_specialist": 3, "timeline_specialist": 3, "overseer": 3},
+    "hard":   {"fraud_specialist": 3, "skills_specialist": 4, "timeline_specialist": 4, "overseer": 4},
 }
-# Total steps: easy=7, medium=10, hard=13
+# Total steps: easy=8, medium=11, hard=15
 
 # Role instructions delivered to each agent in the observation
 ROLE_INSTRUCTIONS: Dict[str, str] = {
@@ -150,6 +163,9 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
         self._reinvestigation_used: bool = False
         self._violations_count: int = 0          # Day 2: out-of-role action counter
         self._done: bool = False
+        # Day 3: Overseer report-reading state
+        self._reports_read: List[str] = []
+        self._read_report_details: Dict[str, str] = {}
         # Per-step response caches (instance, persisted in episode store)
         self._last_clarification: Optional[str] = None
         self._last_reference: Optional[str] = None
@@ -179,6 +195,9 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
             "reinvestigation_used": self._reinvestigation_used,
             "violations_count": self._violations_count,
             "done": self._done,
+            # Day 3
+            "reports_read": list(self._reports_read),
+            "read_report_details": dict(self._read_report_details),
             "last_clarification": self._last_clarification,
             "last_reference": self._last_reference,
             "last_verification": self._last_verification,
@@ -207,6 +226,9 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
         self._reinvestigation_used = s["reinvestigation_used"]
         self._violations_count = s.get("violations_count", 0)
         self._done = s["done"]
+        # Day 3
+        self._reports_read = list(s.get("reports_read", []))
+        self._read_report_details = dict(s.get("read_report_details", {}))
         self._last_clarification = s.get("last_clarification")
         self._last_reference = s.get("last_reference")
         self._last_verification = s.get("last_verification")
@@ -250,6 +272,9 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
         self._reinvestigation_used = False
         self._violations_count = 0
         self._done = False
+        # Day 3
+        self._reports_read = []
+        self._read_report_details = {}
         self._last_clarification = None
         self._last_reference = None
         self._last_verification = None
@@ -269,6 +294,8 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
             available_actions=self._get_available_actions(),
             steps_remaining=phase_budget,
             total_steps_remaining=self._max_total_steps,
+            reports_read=[],
+            read_report_details={},
             feedback=(
                 "Fleet episode started. The Fraud Specialist begins investigation. "
                 "Read your role_instructions carefully and use your allotted steps wisely."
@@ -344,6 +371,8 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
                 steps_remaining=phase_steps_remaining,
                 total_steps_remaining=total_remaining,
                 violations_count=self._violations_count,
+                reports_read=list(self._reports_read),
+                read_report_details=dict(self._read_report_details),
                 feedback=reason,
                 done=False,
                 reward=0.0,
@@ -386,6 +415,8 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
             steps_remaining=phase_steps_remaining,
             total_steps_remaining=total_remaining,
             violations_count=self._violations_count,
+            reports_read=list(self._reports_read),
+            read_report_details=dict(self._read_report_details),
             feedback=self._last_feedback,
             done=False,
             reward=reward,
@@ -429,23 +460,39 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
 
         # Build validator for the NEXT phase (so available_actions + role_instructions
         # are already correct for the incoming agent)
-        next_validator = SpecialistActionValidator(SPECIALIST_CONFIGS[next_phase])
-        return FleetObservation(
-            task_type=self._task_type,
-            current_phase=next_phase,
-            role_instructions=next_validator.role_instructions(),
-            job_description=self._sample["job_description"],
-            visible_sections=next_validator.filter_sections(self._get_visible_sections()),
-            specialist_reports=list(self._specialist_reports),
-            available_actions=next_validator.available_actions(
+        if next_phase == "overseer":
+            next_available = build_overseer_available_actions(
+                self._reports_read,
+                [r.specialist_role for r in self._specialist_reports],
+                self._reinvestigation_used,
+                OverseerConfig(),
+            )
+            next_role_instructions = OVERSEER_ROLE_INSTRUCTIONS
+            next_visible = {}   # overseer never sees raw sections
+        else:
+            next_validator = SpecialistActionValidator(SPECIALIST_CONFIGS[next_phase])
+            next_available = next_validator.available_actions(
                 self._sections_viewed,
                 self._references_checked,
                 self._verifications_done,
                 self._reinvestigation_used,
-            ),
+            )
+            next_role_instructions = next_validator.role_instructions()
+            next_visible = next_validator.filter_sections(self._get_visible_sections())
+
+        return FleetObservation(
+            task_type=self._task_type,
+            current_phase=next_phase,
+            role_instructions=next_role_instructions,
+            job_description=self._sample["job_description"],
+            visible_sections=next_visible,
+            specialist_reports=list(self._specialist_reports),
+            available_actions=next_available,
             steps_remaining=next_budget,
             total_steps_remaining=total_remaining,
             violations_count=self._violations_count,
+            reports_read=list(self._reports_read),
+            read_report_details=dict(self._read_report_details),
             feedback=(
                 f"{phase.replace('_', ' ').title()} report submitted (reward: {reward:.3f}). "
                 f"Advancing to {next_phase.replace('_', ' ').title()} phase."
@@ -455,75 +502,250 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
         )
 
     # ------------------------------------------------------------------
-    # Overseer phase handler
+    # Overseer phase handler  (Day 3: read_reports + richer validation)
     # ------------------------------------------------------------------
     def _handle_overseer_action(
         self, action: FleetAction, phase_steps_remaining: int
     ) -> FleetObservation:
-        overseer_config = SPECIALIST_CONFIGS["overseer"]
-        validator = SpecialistActionValidator(overseer_config)
+        overseer_cfg = OverseerConfig()
+        all_report_roles = [r.specialist_role for r in self._specialist_reports]
         total_remaining = self._max_total_steps - self._total_steps_used
 
-        # Hard validation for overseer too
-        valid, reason = validator.validate(action)
-        if not valid:
+        # ── Hard validation: action_type must be in OverseerConfig.allowed_actions ──
+        if action.action_type not in overseer_cfg.allowed_actions:
             self._violations_count += 1
+            self._last_feedback = (
+                f"[VIOLATION] Overseer cannot use '{action.action_type}'. "
+                f"Allowed: {overseer_cfg.allowed_actions}. "
+                f"This step costs you a step and earns 0 reward."
+            )
             if phase_steps_remaining <= 0:
                 return self._auto_timeout_overseer()
             return FleetObservation(
                 task_type=self._task_type,
                 current_phase="overseer",
-                role_instructions=validator.role_instructions(),
+                role_instructions=OVERSEER_ROLE_INSTRUCTIONS,
                 job_description=self._sample["job_description"],
-                visible_sections=validator.filter_sections(self._get_visible_sections()),
+                visible_sections={},          # overseer never sees raw sections
                 specialist_reports=list(self._specialist_reports),
-                available_actions=validator.available_actions(
-                    self._sections_viewed, self._references_checked,
-                    self._verifications_done, self._reinvestigation_used,
+                available_actions=build_overseer_available_actions(
+                    self._reports_read, all_report_roles,
+                    self._reinvestigation_used, overseer_cfg,
                 ),
                 steps_remaining=phase_steps_remaining,
                 total_steps_remaining=total_remaining,
                 violations_count=self._violations_count,
-                feedback=reason,
+                reports_read=list(self._reports_read),
+                read_report_details=dict(self._read_report_details),
+                feedback=self._last_feedback,
                 done=False,
                 reward=0.0,
             )
 
-        reward = 0.0
-        if action.action_type == "request_reinvestigation":
-            if not self._reinvestigation_used:
-                self._reinvestigation_used = True
-                target = action.reinvestigation_target or "fraud_specialist"
-                reinvest_reason = action.reinvestigation_reason or "Need more information."
-                self._last_feedback = (
-                    f"Reinvestigation requested for {target}: {reinvest_reason}. "
-                    f"Specialist reports are finalized — use this for your final decision."
-                )
-                reward = 0.02
-            else:
-                self._last_feedback = "Reinvestigation already used. Submit your final decision."
+        # ── Dispatch: read_reports ─────────────────────────────────────
+        if action.action_type == "read_reports":
+            return self._handle_read_reports(action, all_report_roles, overseer_cfg,
+                                             phase_steps_remaining, total_remaining)
 
-            if phase_steps_remaining <= 0:
-                return self._auto_timeout_overseer()
+        # ── Dispatch: request_reinvestigation ──────────────────────────
+        elif action.action_type == "request_reinvestigation":
+            return self._handle_request_reinvestigation(action, all_report_roles, overseer_cfg,
+                                                        phase_steps_remaining, total_remaining)
 
+        # ── Dispatch: submit_final_decision ────────────────────────────
+        elif action.action_type == "submit_final_decision":
+            return self._handle_submit_final_decision(action)
+
+    # ------------------------------------------------------------------
+    # Overseer sub-handlers  (Day 3)
+    # ------------------------------------------------------------------
+
+    def _handle_read_reports(
+        self,
+        action: FleetAction,
+        all_report_roles: List[str],
+        overseer_cfg: OverseerConfig,
+        phase_steps_remaining: int,
+        total_remaining: int,
+    ) -> FleetObservation:
+        """Process the read_reports action — reveal enriched report detail."""
+        target = (action.report_target or "").lower().strip()
+
+        # Validate target
+        valid_targets = set(all_report_roles)
+        if target not in valid_targets:
+            # If target is missing/invalid, offer list of unread reports
+            unread = list(set(all_report_roles) - set(self._reports_read))
+            self._last_feedback = (
+                f"Unknown report_target '{target}'. "
+                f"Use one of: {list(valid_targets)}. "
+                f"Unread so far: {unread}."
+            )
             return FleetObservation(
                 task_type=self._task_type,
                 current_phase="overseer",
-                role_instructions=validator.role_instructions(),
+                role_instructions=OVERSEER_ROLE_INSTRUCTIONS,
                 job_description=self._sample["job_description"],
-                visible_sections=validator.filter_sections(self._get_visible_sections()),
+                visible_sections={},
                 specialist_reports=list(self._specialist_reports),
-                available_actions=["submit_final_decision"],
+                available_actions=build_overseer_available_actions(
+                    self._reports_read, all_report_roles,
+                    self._reinvestigation_used, overseer_cfg,
+                ),
                 steps_remaining=phase_steps_remaining,
                 total_steps_remaining=total_remaining,
                 violations_count=self._violations_count,
+                reports_read=list(self._reports_read),
+                read_report_details=dict(self._read_report_details),
                 feedback=self._last_feedback,
                 done=False,
-                reward=reward,
+                reward=0.0,
             )
 
-        elif action.action_type == "submit_final_decision":
-            return self._handle_submit_final_decision(action)
+        # Already read? Warn but don't penalise
+        if target in self._reports_read:
+            self._last_feedback = (
+                f"You already read the {target} report. "
+                f"Unread reports: {list(set(all_report_roles) - set(self._reports_read))}."
+            )
+            if phase_steps_remaining <= 0:
+                return self._auto_timeout_overseer()
+            return FleetObservation(
+                task_type=self._task_type,
+                current_phase="overseer",
+                role_instructions=OVERSEER_ROLE_INSTRUCTIONS,
+                job_description=self._sample["job_description"],
+                visible_sections={},
+                specialist_reports=list(self._specialist_reports),
+                available_actions=build_overseer_available_actions(
+                    self._reports_read, all_report_roles,
+                    self._reinvestigation_used, overseer_cfg,
+                ),
+                steps_remaining=phase_steps_remaining,
+                total_steps_remaining=total_remaining,
+                violations_count=self._violations_count,
+                reports_read=list(self._reports_read),
+                read_report_details=dict(self._read_report_details),
+                feedback=self._last_feedback,
+                done=False,
+                reward=0.0,
+            )
+
+        # First read of this report — generate enrichment
+        matching = [r for r in self._specialist_reports if r.specialist_role == target]
+        if not matching:
+            self._last_feedback = f"No report found for '{target}'. Reports available: {all_report_roles}."
+            if phase_steps_remaining <= 0:
+                return self._auto_timeout_overseer()
+            return FleetObservation(
+                task_type=self._task_type,
+                current_phase="overseer",
+                role_instructions=OVERSEER_ROLE_INSTRUCTIONS,
+                job_description=self._sample["job_description"],
+                visible_sections={},
+                specialist_reports=list(self._specialist_reports),
+                available_actions=build_overseer_available_actions(
+                    self._reports_read, all_report_roles,
+                    self._reinvestigation_used, overseer_cfg,
+                ),
+                steps_remaining=phase_steps_remaining,
+                total_steps_remaining=total_remaining,
+                violations_count=self._violations_count,
+                reports_read=list(self._reports_read),
+                read_report_details=dict(self._read_report_details),
+                feedback=self._last_feedback,
+                done=False,
+                reward=0.0,
+            )
+
+        report = matching[0]
+        enriched = get_report_enrichment(report, self._sample)
+        self._reports_read.append(target)
+        self._read_report_details[target] = enriched
+
+        reward = compute_read_reward(self._reports_read, all_report_roles, overseer_cfg)
+
+        consensus = get_consensus_hint(self._specialist_reports)
+        unread_remaining = list(set(all_report_roles) - set(self._reports_read))
+        self._last_feedback = (
+            f"Read: {target} report. "
+            + (f"Unread: {unread_remaining}. " if unread_remaining else "All reports read. ")
+            + consensus
+        )
+
+        if phase_steps_remaining <= 0:
+            return self._auto_timeout_overseer(accumulated_reward=reward)
+
+        return FleetObservation(
+            task_type=self._task_type,
+            current_phase="overseer",
+            role_instructions=OVERSEER_ROLE_INSTRUCTIONS,
+            job_description=self._sample["job_description"],
+            visible_sections={},
+            specialist_reports=list(self._specialist_reports),
+            available_actions=build_overseer_available_actions(
+                self._reports_read, all_report_roles,
+                self._reinvestigation_used, overseer_cfg,
+            ),
+            steps_remaining=phase_steps_remaining,
+            total_steps_remaining=total_remaining,
+            violations_count=self._violations_count,
+            reports_read=list(self._reports_read),
+            read_report_details=dict(self._read_report_details),
+            feedback=self._last_feedback,
+            done=False,
+            reward=reward,
+        )
+
+    def _handle_request_reinvestigation(
+        self,
+        action: FleetAction,
+        all_report_roles: List[str],
+        overseer_cfg: OverseerConfig,
+        phase_steps_remaining: int,
+        total_remaining: int,
+    ) -> FleetObservation:
+        """Process request_reinvestigation (once per episode)."""
+        if not self._reinvestigation_used:
+            self._reinvestigation_used = True
+            target = action.reinvestigation_target or "fraud_specialist"
+            reinvest_reason = action.reinvestigation_reason or "Need more information."
+            self._last_feedback = (
+                f"Reinvestigation requested for {target}: {reinvest_reason}. "
+                "Specialist reports are finalised — this note informs your final decision. "
+                "Now submit_final_decision."
+            )
+            reward = 0.02
+        else:
+            self._last_feedback = (
+                "Reinvestigation already used this episode. "
+                "Submit your final decision now."
+            )
+            reward = 0.0
+
+        if phase_steps_remaining <= 0:
+            return self._auto_timeout_overseer(accumulated_reward=reward)
+
+        return FleetObservation(
+            task_type=self._task_type,
+            current_phase="overseer",
+            role_instructions=OVERSEER_ROLE_INSTRUCTIONS,
+            job_description=self._sample["job_description"],
+            visible_sections={},
+            specialist_reports=list(self._specialist_reports),
+            available_actions=build_overseer_available_actions(
+                self._reports_read, all_report_roles,
+                self._reinvestigation_used, overseer_cfg,
+            ),
+            steps_remaining=phase_steps_remaining,
+            total_steps_remaining=total_remaining,
+            violations_count=self._violations_count,
+            reports_read=list(self._reports_read),
+            read_report_details=dict(self._read_report_details),
+            feedback=self._last_feedback,
+            done=False,
+            reward=reward,
+        )
 
     def _handle_submit_final_decision(self, action: FleetAction) -> FleetObservation:
         self._done = True
@@ -560,10 +782,18 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
                 specialist_bonus += round(0.20 / 3, 4)   # 0.0667 per correct specialist
         reward += specialist_bonus
 
-        # === Oversight quality bonus (up to 0.05) ===
+        # === Oversight quality bonus (up to 0.08) ===
+        # Day 3: reward deliberate synthesis — reading reports before deciding
+        n_reports_total = len(self._specialist_reports)
+        n_reports_read = len(set(self._reports_read))
+        if n_reports_total > 0 and n_reports_read >= n_reports_total:
+            reward += 0.04   # read ALL reports before deciding
+        elif n_reports_read > 0:
+            reward += 0.01   # read at least one
+
         # Reward for using reinvestigation appropriately
         if self._reinvestigation_used and gt["is_fraud"]:
-            reward += 0.05   # used oversight appropriately for a fraud case
+            reward += 0.04   # used oversight appropriately for a fraud case
         elif not self._reinvestigation_used and not gt["is_fraud"]:
             reward += 0.03   # efficient: didn't waste reinvestigation on clean resume
 
@@ -597,6 +827,10 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
             f" Violations: {self._violations_count} (penalty: -{violation_penalty:.2f})."
             if self._violations_count > 0 else ""
         )
+        read_note = (
+            f" Read {len(set(self._reports_read))}/{len(self._specialist_reports)} specialist reports."
+            if self._specialist_reports else ""
+        )
         return FleetObservation(
             task_type=self._task_type,
             current_phase="complete",
@@ -608,7 +842,12 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
             steps_remaining=0,
             total_steps_remaining=0,
             violations_count=self._violations_count,
-            feedback=f"Fleet decision submitted. Episode complete. Final reward: {final_reward:.3f}.{violation_note}",
+            reports_read=list(self._reports_read),
+            read_report_details=dict(self._read_report_details),
+            feedback=(
+                f"Fleet decision submitted. Episode complete. "
+                f"Final reward: {final_reward:.3f}.{violation_note}{read_note}"
+            ),
             done=True,
             reward=final_reward,
         )
@@ -767,6 +1006,8 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
             steps_remaining=0,
             total_steps_remaining=0,
             violations_count=self._violations_count,
+            reports_read=list(self._reports_read),
+            read_report_details=dict(self._read_report_details),
             feedback=feedback,
             done=True,
             reward=reward,
@@ -797,29 +1038,51 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
         next_phase = PHASES[self._phase_idx]
         next_budget = PHASE_BUDGETS[self._task_type][next_phase]
         total_remaining = self._max_total_steps - self._total_steps_used
-        next_validator = SpecialistActionValidator(SPECIALIST_CONFIGS[next_phase])
+
+        if next_phase == "overseer":
+            next_available = build_overseer_available_actions(
+                self._reports_read,
+                [r.specialist_role for r in self._specialist_reports],
+                self._reinvestigation_used,
+                OverseerConfig(),
+            )
+            next_role_instructions = OVERSEER_ROLE_INSTRUCTIONS
+            next_visible: Dict[str, str] = {}
+        else:
+            next_validator = SpecialistActionValidator(SPECIALIST_CONFIGS[next_phase])
+            next_available = next_validator.available_actions(
+                self._sections_viewed, self._references_checked,
+                self._verifications_done, self._reinvestigation_used,
+            )
+            next_role_instructions = next_validator.role_instructions()
+            next_visible = next_validator.filter_sections(self._get_visible_sections())
 
         return FleetObservation(
             task_type=self._task_type,
             current_phase=next_phase,
-            role_instructions=next_validator.role_instructions(),
+            role_instructions=next_role_instructions,
             job_description=self._sample["job_description"],
-            visible_sections=next_validator.filter_sections(self._get_visible_sections()),
+            visible_sections=next_visible,
             specialist_reports=list(self._specialist_reports),
-            available_actions=next_validator.available_actions(
-                self._sections_viewed, self._references_checked,
-                self._verifications_done, self._reinvestigation_used,
-            ),
+            available_actions=next_available,
             steps_remaining=next_budget,
             total_steps_remaining=total_remaining,
             violations_count=self._violations_count,
+            reports_read=list(self._reports_read),
+            read_report_details=dict(self._read_report_details),
             feedback=f"Phase budget for {phase} exhausted. Auto-advanced to {next_phase}.",
             done=False,
             reward=accumulated_reward,
         )
 
-    def _auto_timeout_overseer(self) -> FleetObservation:
+    def _auto_timeout_overseer(self, accumulated_reward: float = 0.0) -> FleetObservation:
+        """
+        Called when the overseer's phase budget is exhausted.
+        accumulated_reward carries any reward earned on the step that triggered
+        the timeout (e.g. a read_reports reward on the final overseer step).
+        """
         self._done = True
+        final_reward = max(0.0, min(1.0, accumulated_reward))
         return FleetObservation(
             task_type=self._task_type,
             current_phase="complete",
@@ -831,9 +1094,14 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
             steps_remaining=0,
             total_steps_remaining=0,
             violations_count=self._violations_count,
-            feedback="Overseer step budget exhausted. Episode ended with partial reward.",
+            reports_read=list(self._reports_read),
+            read_report_details=dict(self._read_report_details),
+            feedback=(
+                f"Overseer step budget exhausted. Episode ended. "
+                f"Read {len(set(self._reports_read))}/{len(self._specialist_reports)} reports."
+            ),
             done=True,
-            reward=0.0,
+            reward=final_reward,
         )
 
     @property
@@ -852,5 +1120,7 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
             clarifications_asked=self._clarifications_asked,
             reinvestigation_used=self._reinvestigation_used,
             violations_count=self._violations_count,
+            reports_read=list(self._reports_read),
+            read_report_details=dict(self._read_report_details),
             done=self._done,
         )
