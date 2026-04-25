@@ -1,0 +1,65 @@
+[
+  {
+    "task": "easy",
+    "seed": 10,
+    "agent": "rule_based",
+    "total_reward": 1.0,
+    "steps": 8
+  },
+  {
+    "task": "easy",
+    "seed": 20,
+    "agent": "rule_based",
+    "total_reward": 1.0,
+    "steps": 8
+  },
+  {
+    "task": "easy",
+    "seed": 30,
+    "agent": "rule_based",
+    "total_reward": 0.2405,
+    "steps": 8
+  },
+  {
+    "task": "medium",
+    "seed": 10,
+    "agent": "rule_based",
+    "total_reward": 0.6201,
+    "steps": 11
+  },
+  {
+    "task": "medium",
+    "seed": 20,
+    "agent": "rule_based",
+    "total_reward": 1.0,
+    "steps": 11
+  },
+  {
+    "task": "medium",
+    "seed": 30,
+    "agent": "rule_based",
+    "total_reward": 1.0,
+    "steps": 11
+  },
+  {
+    "task": "hard",
+    "seed": 10,
+    "agent": "rule_based",
+    "total_reward": 1.0,
+    "steps": 14
+  },
+  {
+    "task": "hard",
+    "seed": 20,
+    "agent": "rule_based",
+    "total_reward": 1.0,
+    "steps": 14
+  },
+  {
+    "task": "hard",
+    "seed": 30,
+    "agent": "rule_based",
+    "total_reward": 1.0,
+    "steps": 14
+  }
+]
