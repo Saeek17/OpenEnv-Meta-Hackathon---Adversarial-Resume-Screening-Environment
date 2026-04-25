@@ -389,35 +389,237 @@ def score_completion(completion: str, phase: str, available_actions: list) -> fl
     return min(reward, 1.0)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Component tracker  (build guide point 15: monitor individual reward columns)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ComponentTracker:
+    """Accumulates per-component reward statistics across training completions.
+
+    Tracks five success indicators independently so a rising overall reward
+    cannot mask a collapsing sub-component (e.g. exploit rate creeping up).
+    """
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.n             = 0
+        self.json_valid    = 0   # % completions with parseable JSON
+        self.action_valid  = 0   # % with role-legal action_type
+        self.action_opt    = 0   # % with phase-optimal first choice
+        self.fraud_kw      = 0   # % with fraud keyword in reasoning
+        self.exploit_hit   = 0   # % triggering anti-exploit penalty
+        self.total_reward  = 0.0
+        self.samples: list[tuple[str,float]] = []  # (completion, reward) for inspection
+
+    def update(self, completion: str, breakdown: dict):
+        self.n            += 1
+        self.json_valid   += breakdown["json_valid"]
+        self.action_valid += breakdown["action_valid"]
+        self.action_opt   += breakdown["action_opt"]
+        self.fraud_kw     += breakdown["fraud_kw"]
+        self.exploit_hit  += breakdown["exploit_hit"]
+        self.total_reward += breakdown["total"]
+        if len(self.samples) < 8:          # keep a small window for inspection
+            self.samples.append((completion, breakdown["total"]))
+
+    def summary(self) -> dict:
+        if self.n == 0:
+            return {}
+        return {
+            "n":               self.n,
+            "reward_mean":     round(self.total_reward / self.n, 4),
+            "json_rate":       round(self.json_valid   / self.n, 3),
+            "valid_action":    round(self.action_valid / self.n, 3),
+            "optimal_action":  round(self.action_opt   / self.n, 3),
+            "fraud_kw_rate":   round(self.fraud_kw     / self.n, 3),
+            "exploit_rate":    round(self.exploit_hit  / self.n, 3),
+        }
+
+
+_tracker = ComponentTracker()   # module-level, shared with callback
+
+
+def score_completion_detailed(completion: str, phase: str, available_actions: list) -> dict:
+    """Score one completion and return a per-component breakdown dict.
+
+    Used by the rich monitoring callback to track individual indicators.
+    Returns: {total, json_valid, action_valid, action_opt, fraud_kw, exploit_hit}
+    """
+    breakdown = {
+        "total": 0.0, "json_valid": 0, "action_valid": 0,
+        "action_opt": 0, "fraud_kw": 0, "exploit_hit": 0,
+    }
+    reward = 0.0
+
+    action = None
+    match  = re.search(r'\{[^{}]+\}', str(completion), re.DOTALL)
+    if match:
+        try:
+            action = json.loads(match.group())
+            reward += 0.15
+            breakdown["json_valid"] = 1
+        except json.JSONDecodeError:
+            pass
+
+    if action is None:
+        breakdown["total"] = 0.0
+        return breakdown
+
+    action_type = action.get("action_type", "")
+
+    if action_type in available_actions:
+        reward += 0.25
+        breakdown["action_valid"] = 1
+    else:
+        breakdown["total"] = reward
+        return breakdown
+
+    best = PHASE_BEST_ACTIONS.get(phase, [])
+    if action_type in best[:1]:
+        reward += 0.25
+        breakdown["action_opt"] = 1
+    elif action_type in best:
+        reward += 0.10
+
+    if action_type == "check_reference":
+        reward += 0.20 if action.get("reference_id") == "ref2" else 0.10
+    elif action_type == "view_section":
+        reward += 0.20 if action.get("section", "") in HIGH_VALUE_SECTIONS else 0.08
+    elif action_type == "read_reports":
+        if action.get("report_target") in ["fraud_specialist", "skills_specialist", "timeline_specialist"]:
+            reward += 0.20
+    elif action_type == "ask_clarification":
+        q = action.get("question", "")
+        reward += 0.20 if len(q) > 20 else (0.08 if q else 0)
+    elif action_type in ("submit_specialist_report", "submit_final_decision"):
+        if action_type == "submit_specialist_report":
+            findings_text = action.get("findings", "") or ""
+            has_findings  = len(findings_text.strip()) >= 30
+            reward += (0.10 if has_findings else 0) + \
+                      (0.05 if action.get("has_issues") is not None else 0) + \
+                      (0.05 if isinstance(action.get("specialist_confidence"), (int, float)) else 0)
+        else:
+            reward += (0.10 if action.get("decision") in ("accept", "reject") else 0) + \
+                      (0.05 if action.get("fraud_flag") is not None else 0) + \
+                      (0.05 if isinstance(action.get("confidence"), (int, float)) else 0)
+
+    if action_type == "submit_final_decision":
+        fr = action.get("fraud_reasoning", "") or ""
+        if action.get("fraud_flag") and len(fr.strip()) < 15:
+            reward = max(0.0, reward - 0.10)
+            breakdown["exploit_hit"] = 1
+
+    reasoning = action.get("findings", "") or action.get("fraud_reasoning", "")
+    fraud_keywords = {
+        "failed", "denied", "fabricated", "mismatch", "unverifiable",
+        "cannot verify", "not in our system", "inflated", "exaggerated",
+        "conflict", "impossible", "fabrication",
+    }
+    if any(kw in reasoning.lower() for kw in fraud_keywords):
+        reward += 0.15
+        breakdown["fraud_kw"] = 1
+    elif len(reasoning) > 30:
+        reward += 0.05
+
+    breakdown["total"] = min(reward, 1.0)
+    return breakdown
+
+
 def make_reward_fn(records: list[dict]):
+    """Build a reward function compatible with GRPOTrainer.
+
+    As a side effect, updates the module-level _tracker with per-component
+    breakdowns so RichMonitoringCallback can log individual metrics.
     """
-    Build a reward function compatible with GRPOTrainer.
-    GRPOTrainer calls: reward_fn(completions, prompts=..., **kwargs)
-    """
-    # Build lookup: prompt_text → (phase, available_actions)
     prompt_meta = {}
     for r in records:
-        prompt_meta[r["prompt"]] = (
-            r["phase"],
-            json.loads(r["available_actions"]),
-        )
+        prompt_meta[r["prompt"]] = (r["phase"], json.loads(r["available_actions"]))
 
     def reward_fn(completions, prompts=None, **kwargs):
         rewards = []
         for i, completion in enumerate(completions):
-            # prompts[i] is a list of message dicts; extract the user content
             prompt_text = ""
             if prompts and i < len(prompts):
                 for msg in prompts[i]:
                     if isinstance(msg, dict) and msg.get("role") == "user":
                         prompt_text = msg.get("content", "")
                         break
-
             phase, available = prompt_meta.get(prompt_text, ("fraud_specialist", []))
-            rewards.append(score_completion(completion, phase, available))
+            bd = score_completion_detailed(completion, phase, available)
+            _tracker.update(completion, bd)
+            rewards.append(bd["total"])
         return rewards
 
     return reward_fn
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Rich monitoring callback  (build guide point 15)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class RichMonitoringCallback(TrainerCallback):
+    """Logs per-component reward metrics and inspects sample generations.
+
+    Every `log_every` steps:
+    - Prints a table of five success indicators (not just rewards/mean)
+    - Flags if exploit_rate is rising (model may be gaming the reward)
+    - Prints 2 sample completions so you can see what strategy the model uses
+
+    This implements build guide point 15: "monitor the right things."
+    """
+    def __init__(self, log_every: int = 25):
+        self.log_every   = log_every
+        self._step_count = 0
+        self._history: list[dict] = []   # per-interval component summaries
+
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        if not logs:
+            return
+        self._step_count += 1
+
+        if self._step_count % self.log_every != 0:
+            return
+
+        summary = _tracker.summary()
+        if not summary:
+            return
+
+        self._history.append({"step": state.global_step, **summary})
+
+        # ── Component table ──────────────────────────────────────────────
+        print(f"\n{'─'*62}")
+        print(f"  Step {state.global_step:>4d} │ Component breakdown (n={summary['n']})")
+        print(f"{'─'*62}")
+        print(f"  reward_mean    {summary['reward_mean']:.4f}")
+        print(f"  json_rate      {summary['json_rate']:.3f}   ← should approach 1.0")
+        print(f"  valid_action   {summary['valid_action']:.3f}   ← role discipline")
+        print(f"  optimal_action {summary['optimal_action']:.3f}   ← phase strategy")
+        print(f"  fraud_kw_rate  {summary['fraud_kw_rate']:.3f}   ← reasoning quality")
+        print(f"  exploit_rate   {summary['exploit_rate']:.3f}   ← should stay near 0")
+
+        # ── Exploit warning ──────────────────────────────────────────────
+        if summary["exploit_rate"] > 0.15:
+            print(f"\n  ⚠️  exploit_rate={summary['exploit_rate']:.3f} > 0.15 — model may be gaming reward!")
+
+        # ── Trend check on fraud_kw (should rise) ───────────────────────
+        if len(self._history) >= 3:
+            kw_now  = self._history[-1]["fraud_kw_rate"]
+            kw_prev = self._history[-3]["fraud_kw_rate"]
+            if kw_now < kw_prev - 0.05:
+                print(f"  ⚠️  fraud_kw_rate dropped {kw_prev:.3f}→{kw_now:.3f} — reasoning may be degrading")
+
+        # ── Sample generation inspection (2 completions) ─────────────────
+        if _tracker.samples:
+            print(f"\n  Sample generations:")
+            for comp, r in _tracker.samples[:2]:
+                snippet = comp.strip().replace("\n", " ")[:120]
+                print(f"    reward={r:.3f} │ {snippet}")
+
+        print(f"{'─'*62}\n")
+
+        # Reset tracker for next interval
+        _tracker.reset()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -506,15 +708,19 @@ def main():
     reward_fn = make_reward_fn(records)
 
     # ── Step 6: Train ─────────────────────────────────────────────────────
+    monitor_cb = RichMonitoringCallback(log_every=25)
+
     trainer = GRPOTrainer(
         model=model,
         args=grpo_cfg,
         train_dataset=dataset,
         reward_funcs=reward_fn,
         processing_class=tokenizer,
+        callbacks=[monitor_cb],
     )
 
     print("Starting GRPO training …")
+    print("Monitoring: reward_mean | json_rate | valid_action | optimal_action | fraud_kw_rate | exploit_rate\n")
     train_result = trainer.train()
     print(f"\nTraining complete. Metrics: {train_result.metrics}")
 
@@ -524,7 +730,7 @@ def main():
     tokenizer.save_pretrained(save_path)
     print(f"Model saved to {save_path}")
 
-    # ── Step 8: Plot reward curve ──────────────────────────────────────────
+    # ── Step 8: Plot reward curve + component curves ──────────────────────
     try:
         import matplotlib.pyplot as plt
         history = trainer.state.log_history
@@ -533,18 +739,55 @@ def main():
 
         if steps:
             os.makedirs("assets", exist_ok=True)
+
+            # ── Plot 1: Main reward curve ──────────────────────────────
             plt.figure(figsize=(10, 4))
-            plt.plot(steps, rewards, marker="o", markersize=3, linewidth=1.5)
+            plt.plot(steps, rewards, marker="o", markersize=3, linewidth=1.5, label="reward_mean")
             plt.xlabel("Training Step")
-            plt.ylabel("Mean Reward (per step)")
-            plt.title("GRPO Training — Hiring Fleet Stage 1\n(Qwen2.5-1.5B-Instruct)")
+            plt.ylabel("Mean Reward")
+            plt.title("GRPO Training — Hiring Fleet (Qwen2.5-1.5B-Instruct)")
             plt.grid(True, alpha=0.4)
             plt.tight_layout()
             plt.savefig("assets/reward_curve.png", dpi=150)
             plt.show()
-            print("Reward curve saved to assets/reward_curve.png")
+            print("Saved: assets/reward_curve.png")
+
+            # ── Plot 2: Component curves from monitoring callback ──────
+            comp_hist = monitor_cb._history
+            if comp_hist:
+                c_steps  = [h["step"]           for h in comp_hist]
+                c_json   = [h["json_rate"]       for h in comp_hist]
+                c_valid  = [h["valid_action"]    for h in comp_hist]
+                c_opt    = [h["optimal_action"]  for h in comp_hist]
+                c_kw     = [h["fraud_kw_rate"]   for h in comp_hist]
+                c_expl   = [h["exploit_rate"]    for h in comp_hist]
+
+                fig, axes = plt.subplots(2, 3, figsize=(15, 7))
+                fig.suptitle("Training Component Metrics (build guide point 15)", fontsize=13)
+
+                plots = [
+                    (axes[0,0], c_json,  "json_rate",       "JSON parse success",   "tab:blue"),
+                    (axes[0,1], c_valid, "valid_action",     "Role-valid action",    "tab:green"),
+                    (axes[0,2], c_opt,   "optimal_action",   "Phase-optimal action", "tab:orange"),
+                    (axes[1,0], c_kw,    "fraud_kw_rate",    "Fraud keyword in reasoning", "tab:purple"),
+                    (axes[1,1], c_expl,  "exploit_rate",     "Anti-exploit triggered ↓", "tab:red"),
+                    (axes[1,2],
+                     [h["reward_mean"] for h in comp_hist],
+                     "reward_mean", "Overall reward", "black"),
+                ]
+                for ax, data, label, title, color in plots:
+                    ax.plot(c_steps, data, marker="o", markersize=3, color=color, linewidth=1.5)
+                    ax.set_title(title, fontsize=10)
+                    ax.set_xlabel("Step")
+                    ax.set_ylim(0, 1.05)
+                    ax.grid(True, alpha=0.3)
+
+                plt.tight_layout()
+                plt.savefig("assets/component_curves.png", dpi=150)
+                plt.show()
+                print("Saved: assets/component_curves.png")
     except Exception as e:
-        print(f"Could not save plot: {e}")
+        print(f"Could not save plots: {e}")
 
 
 if __name__ == "__main__":
