@@ -56,7 +56,7 @@ Each specialist submits a structured `SpecialistReport` (findings, `has_issues`,
 
 ## Specialist Roles & Constraints
 
-### Role-Based Action Whitelists (Day 2)
+### Role-Based Action Whitelists
 
 Each specialist can only use the actions relevant to their function. Attempting an out-of-role action is rejected, costs a step, and increments `violations_count`. Each violation deducts **0.05** from the final reward.
 
@@ -65,11 +65,13 @@ Each specialist can only use the actions relevant to their function. Attempting 
 | `fraud_specialist` | `check_reference`, `verify_credential`, `view_section`, `submit_specialist_report` | `header`, `references` |
 | `skills_specialist` | `view_section`, `ask_clarification`, `submit_specialist_report` | `experience`, `education`, `skills`, `projects` |
 | `timeline_specialist` | `view_section`, `ask_clarification`, `submit_specialist_report` | `header`, `summary`, `experience` |
-| `overseer` | `read_reports`, `request_reinvestigation`, `submit_final_decision` | *(no raw sections — report summaries only)* |
+| `overseer` | `read_reports`, `request_reinvestigation`, `submit_final_decision` | *(report summaries only)* |
 
-Observations are also **role-filtered**: a skills specialist cannot see sections revealed by the fraud specialist. Each agent only sees what they're supposed to see.
+**Per-phase section isolation**: `_sections_viewed` resets at each phase transition. Each specialist earns reward for viewing their own allowed sections independently — the timeline specialist can view `experience` even if skills already viewed it. Re-viewing the same section within a phase returns a hint but costs no step.
 
-### Overseer Capabilities (Day 3)
+**Observation role-filtering**: a skills specialist cannot see sections revealed by the fraud specialist. Each agent only sees what they're supposed to see.
+
+### Overseer Capabilities
 
 The Overseer operates differently from specialists:
 - **`read_reports`** — explicitly requests the full enriched text of one specialist report (`report_target: fraud_specialist | skills_specialist | timeline_specialist`). Each read earns +0.02; reading all three earns an additional +0.03 thoroughness bonus.
@@ -116,7 +118,7 @@ The Overseer operates differently from specialists:
 
 ---
 
-## Reward Function (Day 4)
+## Reward Function
 
 Rewards accumulate across all four phases. All values are in **[0.0, 1.0]** (clamped).
 
@@ -130,6 +132,7 @@ Rewards accumulate across all four phases. All values are in **[0.0, 1.0]** (cla
 | `ask_clarification` | Generic answer | +0.01 |
 | `check_reference` | Reveals fraud signal | +0.05 |
 | `check_reference` | Clean reference | +0.02 |
+| `check_reference` | Reference not found | +0.00 |
 | `verify_credential` | Reveals FAILED | +0.05 |
 | `verify_credential` | All verified | +0.02 |
 | `read_reports` | Per specialist report read | +0.02 |
@@ -163,15 +166,23 @@ tier_multiplier = easy: 1.0 | medium: 1.1 | hard: 1.3
 
 ---
 
-## Task Difficulty
+## Dataset
+
+36 resumes across three difficulty tiers (12 each). **Fraud ratio: 42% per tier** (5/12), balanced for GRPO reward variance.
 
 | Tier | Episodes | Total Steps | Description |
 |:---|:---:|:---:|:---|
-| **Easy** | 12 | 8 | Clear match/mismatch, obvious fraud (impossible timelines, fake institutions) |
+| **Easy** | 12 | 8 | Clear match/mismatch, obvious fraud (impossible timelines, fake institutions, role-mismatch references) |
 | **Medium** | 12 | 11 | Subtle skill gaps, partial matches, embellished but plausible resumes |
 | **Hard** | 12 | 15 | Title inflation, scope exaggeration, references that contradict claims, sophisticated fabrication |
 
-Graders are **fully deterministic** — all reward computation uses ground-truth fields in the dataset (`is_fraud`, `fraud_indicators`, `employment_gaps`, `required_skills`). No LLM judge required.
+Every resume includes:
+- `required_skills` — extracted from job description, used for skills enrichment
+- `employment_gaps` — derived from fraud indicators, used for timeline enrichment
+- `reference_check_results` — ref1 (always present) and ref2 (present on fraud resumes, often a denial)
+- `verification_data` — at least one `False` entry on all fraud resumes (so `verify_credential` gives the correct 0.05 signal)
+
+Graders are **fully deterministic** — all reward computation uses ground-truth fields (`is_fraud`, `fraud_indicators`, `employment_gaps`, `required_skills`). No LLM judge required.
 
 ---
 
@@ -216,6 +227,49 @@ python test_day3_overseer.py
 
 ---
 
+## GRPO Training
+
+The environment is fully ready for GRPO training. All reward signals are deterministic and dense enough for stable gradient estimation.
+
+### Prerequisites
+
+```bash
+pip install trl accelerate transformers torch datasets
+```
+
+### Recommended Model
+
+`Qwen/Qwen2.5-1.5B-Instruct` — fits in ~3 GB VRAM, strong instruction-following, fast iteration.
+
+### Platform Recommendations
+
+| Platform | GPU | VRAM | Cost | Notes |
+|:---|:---|:---|:---|:---|
+| **Kaggle** | T4 ×2 | 32 GB | Free (30 h/week) | Best for first run |
+| **Google Colab Pro** | T4 / A100 | 16–40 GB | ~$10/month | Easy fallback |
+| **RunPod** | RTX 3090 | 24 GB | ~$0.44/hr | Best value for full runs |
+| Mac M-series | MPS | shared | Free | Slow; no mixed precision |
+
+A single T4 (16 GB) is sufficient for `Qwen2.5-1.5B-Instruct` with GRPO group_size=8.
+
+### Running GRPO Training
+
+```bash
+export ENV_URL="https://ishikamahadar-resume-env.hf.space"  # or local
+python train_grpo.py
+```
+
+### Two-Stage Training Roadmap
+
+| Stage | When | Focus |
+|:---|:---|:---|
+| **Stage 1** (now) | First run | Role discipline, fraud detection, report quality — standard GRPO on the 12-component reward |
+| **Stage 2** (after Stage 1 converges) | Theme #2 integration | Long-horizon planning bonus: reward coherent trajectories where specialist `has_issues` flags correctly predict the overseer's final decision across the full 4-phase episode |
+
+Stage 2 aligns with **Theme #2 — Long-Horizon Planning + Scale AI Bonus**. The dense intermediate rewards (per specialist report) and delayed terminal reward (overseer decision) make this environment naturally suited for long-horizon RL. After Stage 1 establishes a base policy, Stage 2 adds a trajectory-level coherence bonus that incentivises agents to plan investigations with the final verdict in mind from the first phase.
+
+---
+
 ## API Endpoints
 
 | Method | Path | Description |
@@ -242,6 +296,9 @@ python test_day3_overseer.py
 | **Step budget** | easy=6 / med=8 / hard=10 | easy=8 / med=11 / hard=15 |
 | **Inference script** | `inference.py` | `inference_fleet.py` |
 | **Test coverage** | Minimal | 78 tests (59 unit + 19 E2E) |
+| **Fraud balance** | ~17% easy/medium | 42% all tiers |
+| **Section tracking** | Global across phases | Per-phase (each specialist earns independently) |
+| **Re-view behavior** | Free (no step cost) | Free (no step cost) |
 
 ---
 
