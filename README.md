@@ -23,7 +23,7 @@ tags: [openenv]
 |:---|:---|
 | 🌐 **Live Environment** | [HuggingFace Space — resume-env](https://huggingface.co/spaces/IshikaMahadar/resume-env) |
 | 📓 **Colab Training Notebook** | [train_grpo_fleet.ipynb](./train_grpo_fleet.ipynb) |
-| 🤖 **Trained LoRA Adapter** | [`grpo_results/grpo_fleet_output/final/`](./grpo_results/grpo_fleet_output/final/) |
+| 🤖 **Trained LoRA Adapter** | [IshikaMahadar/hiring-fleet-grpo-adapter](https://huggingface.co/IshikaMahadar/hiring-fleet-grpo-adapter) |
 | 📈 **GRPO Reward Curve** | 0.736 → 0.850 over 800 steps — see Training section |
 | 📊 **Evaluation Results** | Rule-based 0.873 vs Fine-tuned 0.870 — see Evaluation section |
 | 💻 **GitHub Repo** | [Ishika-eng/OpenEnv-Meta-Hackathon](https://github.com/Ishika-eng/OpenEnv-Meta-Hackathon---Adversarial-Resume-Screening-Environment) |
