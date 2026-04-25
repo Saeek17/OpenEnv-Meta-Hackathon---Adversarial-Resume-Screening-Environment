@@ -1042,33 +1042,74 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
     # Scoring helpers
     # ------------------------------------------------------------------
     def _score_specialist_report(self, phase: str, report: SpecialistReport) -> float:
-        """Award reward for a useful specialist report."""
-        gt = self._sample["ground_truth"]
-        reward = 0.0
+        """Award reward for a useful specialist report with process-aware checks.
+
+        Beyond outcome correctness (has_issues vs ground truth), this function
+        applies lightweight process supervision:
+          - Evidence-consistency check (fraud specialist): penalises contradictions
+            between tool call results and the submitted conclusion. If verify_credential
+            returned FAILED but has_issues=False, the reasoning chain is broken.
+          - Findings-grounding bonus (fraud specialist): rewards findings that
+            explicitly reference tool outcomes seen during investigation.
+          - Section-depth check (skills specialist): rewards substantive findings
+            that follow from actually viewing sections.
+          - Timeline-evidence check (timeline specialist): rewards findings that
+            cite specific evidence (dates, gaps, overlaps) when issues are raised.
+        """
+        gt            = self._sample["ground_truth"]
+        findings_low  = (report.findings or "").lower()
+        reward        = 0.0
 
         if phase == "fraud_specialist":
-            # Correct fraud signal: specialist flagged issues when fraud exists and vice versa
             correct_signal = (report.has_issues == gt["is_fraud"])
             reward += 0.06 if correct_signal else 0.01
-            # Bonus for high confidence when correct
             if correct_signal:
                 reward += round(0.04 * report.confidence, 4)
 
+            # ── Process check: tool evidence → conclusion consistency ─────
+            vr = (self._last_verification or "").lower()
+            rr = (self._last_reference   or "").lower()
+            denial_words = [
+                "cannot verify", "not in our system", "denies",
+                "did not work", "no record", "not employed",
+            ]
+            # Contradiction: credential FAILED but specialist says no issues
+            if "failed" in vr and not report.has_issues:
+                reward = max(0.0, reward - 0.03)
+            # Contradiction: reference denied employment but specialist says no issues
+            if any(w in rr for w in denial_words) and not report.has_issues:
+                reward = max(0.0, reward - 0.03)
+            # Grounding bonus: findings explicitly cite the tool outcomes observed
+            grounding_keywords = [
+                "failed", "verified", "reference", "credential",
+                "denied", "cannot verify", "not in our system",
+            ]
+            if any(kw in findings_low for kw in grounding_keywords) and len(findings_low) > 20:
+                reward += 0.02
+
         elif phase == "skills_specialist":
-            # Correct match signal: flag issues only when decision is reject
             expected_issues = (gt["decision"] == "reject")
-            correct_signal = (report.has_issues == expected_issues)
+            correct_signal  = (report.has_issues == expected_issues)
             reward += 0.05 if correct_signal else 0.01
             if correct_signal:
                 reward += round(0.03 * report.confidence, 4)
+            # Process check: reward substantive findings that follow from viewing sections
+            if self._sections_viewed_this_phase and len(findings_low) > 30:
+                reward += 0.01
 
         elif phase == "timeline_specialist":
-            # Similar to skills: flag issues if fraud or reject
             expected_issues = gt["is_fraud"] or (gt["decision"] == "reject")
-            correct_signal = (report.has_issues == expected_issues)
+            correct_signal  = (report.has_issues == expected_issues)
             reward += 0.05 if correct_signal else 0.01
             if correct_signal:
                 reward += round(0.03 * report.confidence, 4)
+            # Process check: issues should cite specific timeline evidence
+            timeline_keywords = [
+                "gap", "date", "overlap", "period", "employment",
+                "timeline", "inconsistent", "conflict", "month", "year",
+            ]
+            if report.has_issues and any(kw in findings_low for kw in timeline_keywords):
+                reward += 0.01
 
         return round(min(reward, 0.10), 4)
 
