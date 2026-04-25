@@ -9,316 +9,225 @@ app_port: 7860
 tags: [openenv]
 ---
 
-# Hiring Fleet: AI Oversight System
+# 🛡️ Hiring Fleet: AI Oversight System
 
-> **Round 2 — Fleet AI / Scalable Oversight sub-theme**
-> Multi-agent resume screening where specialist AIs investigate in sequence and an Overseer synthesises their reports.
+> **Can four constrained AI specialists catch fraud that fools a single agent?**
+> A multi-agent hiring pipeline where specialist AIs investigate resumes in sequence and an Overseer synthesises their findings into a final decision.
 
 ---
 
-## Materials
+## 📎 Materials
 
 | Resource | Link |
 |:---|:---|
-| **Live Environment** | [HuggingFace Space](https://huggingface.co/spaces/IshikaMahadar/resume-env) |
-| **Colab Training Notebook** | [train_grpo_fleet.ipynb](./train_grpo_fleet.ipynb) |
-| **Trained LoRA Adapter** | `grpo_results/grpo_fleet_output/final/` (in this repo) |
-| **Reward Curve** | ![Reward Curve](assets/reward_curve.png) |
-| **GitHub Repo** | [Ishika-eng/OpenEnv-Meta-Hackathon](https://github.com/Ishika-eng/OpenEnv-Meta-Hackathon---Adversarial-Resume-Screening-Environment) |
-
-### Training Results
-- **Model**: `Qwen/Qwen2.5-1.5B-Instruct` + LoRA (r=16, targeting q_proj + v_proj)
-- **Training**: GRPO, 2 epochs, 800 steps, T4 GPU (Google Colab)
-- **Reward**: Start **0.736** → Best **0.850** (+15.5% improvement)
-- **Dataset**: 36 episodes × ~11 steps each ≈ 396 training prompts
+| 🌐 **Live Environment** | [HuggingFace Space — resume-env](https://huggingface.co/spaces/IshikaMahadar/resume-env) |
+| 📓 **Colab Training Notebook** | [train_grpo_fleet.ipynb](./train_grpo_fleet.ipynb) |
+| 🤖 **Trained LoRA Adapter** | [`grpo_results/grpo_fleet_output/final/`](./grpo_results/grpo_fleet_output/final/) |
+| 📈 **Reward Curve** | See below — 0.736 → 0.850 over 800 steps |
+| 💻 **GitHub Repo** | [Ishika-eng/OpenEnv-Meta-Hackathon](https://github.com/Ishika-eng/OpenEnv-Meta-Hackathon---Adversarial-Resume-Screening-Environment) |
 
 ---
 
-## Overview & Motivation
+## 🎯 The Problem
 
-Automated hiring systems are increasingly targeted by **adversarial resumes** — CVs crafted with fabricated credentials, inflated titles, and keyword stuffing to bypass AI filters. While Round 1 used a single agent to catch these, a single investigator can be fooled by a sophisticated forgery that hides its flaws across different resume sections.
+Every year, companies lose billions hiring fraudulent candidates — people who fake degrees, fabricate work history, and list references who will lie for them. AI-based resume screeners are increasingly the first line of defence. But a single AI agent, reading a resume alone, is easy to fool: sophisticated fraud hides clues in *different sections* of the resume, each one looking innocent in isolation.
 
-Round 2 addresses this with a **Hiring Fleet**: a pipeline of specialist agents, each with a narrow, focused scope, whose independent findings are synthesised by a human-like Overseer. This mirrors how real enterprise HR workflows use dedicated background-check teams before a final hiring authority decides.
+**The real question is: can we build AI oversight that's harder to fool than a single agent?**
 
-The key research question: **can scalable AI oversight — multiple constrained specialists feeding an Overseer — outperform a single capable agent at detecting complex fraud?**
+This project answers that question by building a **Hiring Fleet** — a team of four specialist AI agents who each investigate one narrow slice of the resume, then pass their findings to an Overseer who makes the final call. This mirrors how real enterprise HR works: separate teams for background checks, skills assessment, and employment verification, all feeding a hiring manager.
 
 ---
 
-## Architecture: Four-Phase Fleet
+## 🏗️ How It Works: Four-Phase Pipeline
 
-Each episode runs four sequential phases. Every phase is a separate agent with its own step budget, role instructions, and **hard-enforced action whitelist**.
+Each episode of the environment runs exactly four sequential phases. Every agent has:
+- Its own **step budget** (limited moves)
+- A **hard-enforced action whitelist** (can't use another specialist's tools)
+- A **role-filtered view** (can only see the resume sections relevant to their job)
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    HIRING FLEET EPISODE                     │
-│                                                             │
-│  ① Fraud Specialist  →  ② Skills Specialist                │
-│       (fraud/ref checks)      (technical fit)               │
-│                                                             │
-│  ③ Timeline Specialist  →  ④ Overseer                      │
-│       (chronology/gaps)       (synthesises + decides)       │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                    HIRING FLEET EPISODE                      │
+│                                                              │
+│  ① Fraud Specialist   →   ② Skills Specialist               │
+│    verify credentials        check technical fit             │
+│    call references           ask clarifying questions        │
+│                                                              │
+│  ③ Timeline Specialist  →   ④ Overseer                      │
+│    find employment gaps       reads all 3 reports            │
+│    spot date conflicts        issues final verdict           │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-### Phase Budgets
+### What makes this novel
 
-| Tier | Fraud | Skills | Timeline | Overseer | **Total** |
-|:---|:---:|:---:|:---:|:---:|:---:|
+| Design choice | Why it matters |
+|:---|:---|
+| **Hard action whitelists per role** | Attempting an out-of-role action is rejected, costs a step, and deducts from reward. The agent must learn role discipline. |
+| **Role-filtered observations** | Each specialist only sees the sections they're authorised to view. Skills specialist can't read what the Fraud specialist revealed. |
+| **Per-phase section tracking** | Each specialist earns reward for viewing their allowed sections *independently*. Phase transitions reset the counter — preventing free-riders. |
+| **Overseer synthesis** | The Overseer cannot view sections directly. It must call `read_reports` explicitly to get each specialist's enriched findings — rewarded for reading all three. |
+| **Deterministic, LLM-free reward** | All 12 reward components are computed from ground-truth fields. No judge model required. Stable gradients for GRPO. |
+
+### Step Budgets
+
+| Difficulty | Fraud | Skills | Timeline | Overseer | Total |
+|:---:|:---:|:---:|:---:|:---:|:---:|
 | Easy | 2 | 2 | 2 | 2 | **8** |
 | Medium | 2 | 3 | 3 | 3 | **11** |
 | Hard | 3 | 4 | 4 | 4 | **15** |
 
-Each specialist submits a structured `SpecialistReport` (findings, `has_issues`, confidence) before the next phase begins. If a specialist exhausts their budget without submitting, the environment auto-submits with `has_issues=False` and `confidence=0.3`.
-
 ---
 
-## Specialist Roles & Constraints
+## 📊 Reward Function (12 components)
 
-### Role-Based Action Whitelists
+Rewards are dense across all four phases — every useful action earns something, which gives GRPO stable signal throughout the episode.
 
-Each specialist can only use the actions relevant to their function. Attempting an out-of-role action is rejected, costs a step, and increments `violations_count`. Each violation deducts **0.05** from the final reward.
-
-| Phase | Allowed Actions | Allowed Sections |
-|:---|:---|:---|
-| `fraud_specialist` | `check_reference`, `verify_credential`, `view_section`, `submit_specialist_report` | `header`, `references` |
-| `skills_specialist` | `view_section`, `ask_clarification`, `submit_specialist_report` | `experience`, `education`, `skills`, `projects` |
-| `timeline_specialist` | `view_section`, `ask_clarification`, `submit_specialist_report` | `header`, `summary`, `experience` |
-| `overseer` | `read_reports`, `request_reinvestigation`, `submit_final_decision` | *(report summaries only)* |
-
-**Per-phase section isolation**: `_sections_viewed` resets at each phase transition. Each specialist earns reward for viewing their own allowed sections independently — the timeline specialist can view `experience` even if skills already viewed it. Re-viewing the same section within a phase returns a hint but costs no step.
-
-**Observation role-filtering**: a skills specialist cannot see sections revealed by the fraud specialist. Each agent only sees what they're supposed to see.
-
-### Overseer Capabilities
-
-The Overseer operates differently from specialists:
-- **`read_reports`** — explicitly requests the full enriched text of one specialist report (`report_target: fraud_specialist | skills_specialist | timeline_specialist`). Each read earns +0.02; reading all three earns an additional +0.03 thoroughness bonus.
-- **`request_reinvestigation`** — sends one specialist phase back for a second pass (used at most once). Earns +0.05 if the final decision is correct.
-- **`submit_final_decision`** — terminal action with `decision`, `fraud_flag`, `confidence`, `fraud_reasoning`.
-
----
-
-## Observation & Action Spaces
-
-### `FleetObservation`
-
-| Field | Type | Description |
-|:---|:---|:---|
-| `task_type` | `"easy"\|"medium"\|"hard"` | Difficulty tier |
-| `current_phase` | `"fraud_specialist"\|...\|"overseer"\|"complete"` | Active agent |
-| `role_instructions` | `string` | Instructions for the current agent |
-| `job_description` | `string` | Role requirements |
-| `visible_sections` | `Dict[str, str]` | Role-filtered resume sections |
-| `specialist_reports` | `List[SpecialistReport]` | Reports from completed phases |
-| `available_actions` | `List[str]` | Dynamically filtered valid actions |
-| `clarification_response` | `string\|null` | Answer to last clarification |
-| `reference_response` | `string\|null` | Last reference check result |
-| `verification_result` | `string\|null` | Last credential verification |
-| `steps_remaining` | `int` | Steps left in current phase |
-| `total_steps_remaining` | `int` | Steps left across all phases |
-| `violations_count` | `int` | Out-of-role violations this episode |
-| `reports_read` | `List[str]` | Specialist roles the overseer has read |
-| `read_report_details` | `Dict[str, str]` | Enriched report text per specialist |
-| `feedback` | `string\|null` | Environment hints / violation messages |
-
-### `FleetAction`
-
-| Action | Phase | Key Fields |
-|:---|:---|:---|
-| `view_section` | Specialists | `section` |
-| `ask_clarification` | Skills / Timeline | `question` |
-| `check_reference` | Fraud | `reference_id` (ref1/ref2) |
-| `verify_credential` | Fraud | — |
-| `submit_specialist_report` | Specialists | `findings`, `has_issues`, `specialist_confidence` |
-| `read_reports` | Overseer | `report_target` |
-| `request_reinvestigation` | Overseer | `reinvestigation_target`, `reinvestigation_reason` |
-| `submit_final_decision` | Overseer | `decision`, `fraud_flag`, `confidence`, `fraud_reasoning` |
-
----
-
-## Reward Function
-
-Rewards accumulate across all four phases. All values are in **[0.0, 1.0]** (clamped).
-
-### Per-Step Rewards (investigation quality)
+### Per-step rewards
 
 | Action | Condition | Reward |
 |:---|:---|:---:|
-| `view_section` | High-value section (experience/education/skills) | +0.03 |
-| `view_section` | Other section | +0.01 |
+| `view_section` | High-value (experience/education/skills) | +0.03 |
+| `view_section` | Other | +0.01 |
 | `ask_clarification` | Substantive answer | +0.03 |
-| `ask_clarification` | Generic answer | +0.01 |
 | `check_reference` | Reveals fraud signal | +0.05 |
 | `check_reference` | Clean reference | +0.02 |
-| `check_reference` | Reference not found | +0.00 |
 | `verify_credential` | Reveals FAILED | +0.05 |
 | `verify_credential` | All verified | +0.02 |
-| `read_reports` | Per specialist report read | +0.02 |
-| `read_reports` | All 3 reports read (bonus) | +0.03 |
+| `read_reports` | Per report read | +0.02 |
+| `read_reports` | All 3 read (thoroughness bonus) | +0.03 |
 
-### Specialist Report Scoring
+### Terminal rewards (Overseer decision)
 
-Each `submit_specialist_report` earns a base bonus if the specialist's `has_issues` flag matches ground truth, **scaled by difficulty tier**:
+| Component | Reward |
+|:---|:---:|
+| Correct accept/reject decision | **+0.35** |
+| Correct fraud flag | **+0.25** |
+| Confident + correct (≥0.7) | +0.10 |
+| Fraud reasoning quality (keyword match) | +0.10 |
+| Reinvestigation used + correct | +0.05 |
+| Fleet coordination (all specialists + overseer correct) | +0.03 |
+| Step efficiency (correct + unused budget) | up to +0.04 |
+| Out-of-role violation | **−0.05 each** |
 
-```
-per_specialist_bonus = (0.20 / 3) × tier_multiplier
-tier_multiplier = easy: 1.0 | medium: 1.1 | hard: 1.3
-```
-
-### Terminal Decision Reward (Overseer)
-
-| Component | Condition | Reward |
-|:---|:---|:---:|
-| Decision correct | `decision` matches ground truth | +0.35 |
-| Decision wrong | Mismatch | −0.35 |
-| Fraud flag correct | `fraud_flag` matches `is_fraud` | +0.25 |
-| Fraud flag wrong | Mismatch | −0.25 |
-| Confidence calibration | ≥ 0.7 confidence + both correct | +0.10 |
-| Fraud reasoning quality | Mentions fraud indicator keywords | +0.10 |
-| Reinvestigation bonus | Used + final decision correct | +0.05 |
-| Fleet coordination bonus | All 3 specialists correct + overseer correct | **+0.03** |
-| Step efficiency bonus | Both correct + unused budget | **+0.04 × (1 − steps_used/max_steps)** |
-| Violation penalty | Per out-of-role action | **−0.05 each** |
-
-**Total reward range**: [0.0, 1.0] per episode. Negative intermediates are clamped to 0.0 at terminal.
+**Total range: [0.0, 1.0]** — clamped at terminal. No LLM judge needed.
 
 ---
 
-## Dataset
+## 📁 Dataset
 
-36 resumes across three difficulty tiers (12 each). **Fraud ratio: 42% per tier** (5/12), balanced for GRPO reward variance.
+**36 resumes** across three difficulty tiers (12 each). **Fraud ratio: 42% per tier** — balanced for GRPO reward variance (too few fraud cases → sparse signal; too many → trivial reject policy).
 
-| Tier | Episodes | Total Steps | Description |
-|:---|:---:|:---:|:---|
-| **Easy** | 12 | 8 | Clear match/mismatch, obvious fraud (impossible timelines, fake institutions, role-mismatch references) |
-| **Medium** | 12 | 11 | Subtle skill gaps, partial matches, embellished but plausible resumes |
-| **Hard** | 12 | 15 | Title inflation, scope exaggeration, references that contradict claims, sophisticated fabrication |
+| Tier | Fraud | Description |
+|:---|:---:|:---|
+| **Easy** | 5/12 | Obvious fraud: role-mismatch references, impossible timelines, fake institutions |
+| **Medium** | 5/12 | Embellished resumes: scope exaggeration, compliance misrepresentation, plausible-but-false credentials |
+| **Hard** | 5/12 | Sophisticated fabrication: title inflation, references that contradict claims, multi-section inconsistencies |
 
-Every resume includes:
-- `required_skills` — extracted from job description, used for skills enrichment
-- `employment_gaps` — derived from fraud indicators, used for timeline enrichment
-- `reference_check_results` — ref1 (always present) and ref2 (present on fraud resumes, often a denial)
-- `verification_data` — at least one `False` entry on all fraud resumes (so `verify_credential` gives the correct 0.05 signal)
-
-Graders are **fully deterministic** — all reward computation uses ground-truth fields (`is_fraud`, `fraud_indicators`, `employment_gaps`, `required_skills`). No LLM judge required.
+Every fraud resume guarantees `verify_credential` returns FAILED and `check_reference(ref2)` returns a suspicious or denying response — so the Fraud Specialist always has a detectable signal.
 
 ---
 
-## Setup & Usage
+## 🤖 GRPO Training
 
-### Local Server
+### Results
 
+| Metric | Value |
+|:---|:---|
+| **Model** | Qwen/Qwen2.5-1.5B-Instruct + LoRA (r=16) |
+| **Training** | GRPO, 2 epochs, 800 steps, T4 GPU |
+| **Start reward** | 0.736 |
+| **Best reward** | 0.850 |
+| **Improvement** | **+15.5%** |
+
+![GRPO Reward Curve](assets/reward_curve.png)
+
+The reward curve shows the model learning to:
+1. Output valid JSON action objects reliably
+2. Select role-appropriate actions (no violations)
+3. Prioritise `verify_credential` as the Fraud Specialist's first move
+4. Include fraud indicator keywords in reasoning (`failed`, `denied`, `fabricated`)
+
+### How to train
+
+Open [train_grpo_fleet.ipynb](./train_grpo_fleet.ipynb) in Google Colab (T4 GPU, free tier sufficient).
+
+```
+Cell 0: pip install deps
+Cell 1: set ENV_URL
+Cell 2: paste all training code
+Cell 3: main()   ← runs data collection + training
+Cell 4: plot reward / KL / loss curves
+Cell 5: ls saved adapter
+Cell 6: download results zip
+```
+
+The notebook uses **offline data collection** (rule-based agent walks the environment — no GPU needed) then **GRPOTrainer generates completions internally** and scores them with a static reward function. No live environment calls during the gradient update step.
+
+---
+
+## 🚀 Running the Environment
+
+### Live (no setup)
+[https://huggingface.co/spaces/IshikaMahadar/resume-env](https://huggingface.co/spaces/IshikaMahadar/resume-env)
+
+### Local
 ```bash
 pip install -r requirements.txt
 uvicorn server.fleet_app:app --host 0.0.0.0 --port 7860
 ```
 
 ### Docker
-
 ```bash
 docker build -t hiring-fleet .
 docker run -p 7860:7860 hiring-fleet
 ```
 
-### Running Fleet Inference
-
+### Run inference with any OpenAI-compatible model
 ```bash
 export API_BASE_URL="https://api.groq.com/openai/v1"
 export MODEL_NAME="llama-3.3-70b-versatile"
 export HF_TOKEN="your-api-key"
-export ENV_URL="http://localhost:7860"   # or your HF Space URL
+export ENV_URL="https://ishikamahadar-resume-env.hf.space"
 
 python inference_fleet.py
 ```
 
-`inference_fleet.py` runs 9 fleet episodes (3 per difficulty tier), routing each phase to the correct specialist/overseer prompt. It emits structured `[PHASE]`/`[STEP]`/`[END]` logs and handles action parsing, fallback actions, and overseer report-reading automatically.
-
-### Running Tests
-
-```bash
-# End-to-end tests (no server / no LLM needed)
-python test_e2e_local.py
-
-# Day 3 overseer unit tests
-python test_day3_overseer.py
-```
-
----
-
-## GRPO Training
-
-The environment is fully ready for GRPO training. All reward signals are deterministic and dense enough for stable gradient estimation.
-
-### Prerequisites
-
-```bash
-pip install trl accelerate transformers torch datasets
-```
-
-### Recommended Model
-
-`Qwen/Qwen2.5-1.5B-Instruct` — fits in ~3 GB VRAM, strong instruction-following, fast iteration.
-
-### Platform Recommendations
-
-| Platform | GPU | VRAM | Cost | Notes |
-|:---|:---|:---|:---|:---|
-| **Kaggle** | T4 ×2 | 32 GB | Free (30 h/week) | Best for first run |
-| **Google Colab Pro** | T4 / A100 | 16–40 GB | ~$10/month | Easy fallback |
-| **RunPod** | RTX 3090 | 24 GB | ~$0.44/hr | Best value for full runs |
-| Mac M-series | MPS | shared | Free | Slow; no mixed precision |
-
-A single T4 (16 GB) is sufficient for `Qwen2.5-1.5B-Instruct` with GRPO group_size=8.
-
-### Running GRPO Training
-
-```bash
-export ENV_URL="https://ishikamahadar-resume-env.hf.space"  # or local
-python train_grpo.py
-```
-
-### Two-Stage Training Roadmap
-
-| Stage | When | Focus |
-|:---|:---|:---|
-| **Stage 1** (now) | First run | Role discipline, fraud detection, report quality — standard GRPO on the 12-component reward |
-| **Stage 2** (after Stage 1 converges) | Theme #2 integration | Long-horizon planning bonus: reward coherent trajectories where specialist `has_issues` flags correctly predict the overseer's final decision across the full 4-phase episode |
-
-Stage 2 aligns with **Theme #2 — Long-Horizon Planning + Scale AI Bonus**. The dense intermediate rewards (per specialist report) and delayed terminal reward (overseer decision) make this environment naturally suited for long-horizon RL. After Stage 1 establishes a base policy, Stage 2 adds a trajectory-level coherence bonus that incentivises agents to plan investigations with the final verdict in mind from the first phase.
-
----
-
-## API Endpoints
+### API Endpoints
 
 | Method | Path | Description |
 |:---|:---|:---|
-| POST | `/reset` | Start a new episode, returns initial `FleetObservation` |
-| POST | `/step` | Submit a `FleetAction`, returns next `FleetObservation` with reward |
-| GET | `/state` | Current internal `FleetState` |
+| POST | `/reset` | Start a new episode |
+| POST | `/step` | Submit an action, get next observation + reward |
+| GET | `/state` | Current episode state |
 | GET | `/health` | Health check |
-| GET | `/` | Web UI |
 
 ---
 
-## Round 2 Changes vs Round 1
+## 🔬 Technical Details
 
-| | Round 1 | Round 2 |
+### Action Space (8 actions, role-gated)
+
+| Action | Phase | Key Fields |
 |:---|:---|:---|
-| **Architecture** | Single agent | 4-phase multi-agent fleet |
-| **Action space** | 5 actions (flat) | 8 actions (role-gated) |
-| **Observation** | Flat resume view | Role-filtered per specialist |
-| **Decision maker** | Agent directly decides | Overseer synthesises 3 reports |
-| **Role enforcement** | None | Hard whitelist + violation penalty |
-| **Reward range** | [−1.0, 1.0] | [0.0, 1.0] |
-| **Reward components** | 8 | 12 (tier-scaled, efficiency, coordination) |
-| **Step budget** | easy=6 / med=8 / hard=10 | easy=8 / med=11 / hard=15 |
-| **Inference script** | `inference.py` | `inference_fleet.py` |
-| **Test coverage** | Minimal | 78 tests (59 unit + 19 E2E) |
-| **Fraud balance** | ~17% easy/medium | 42% all tiers |
-| **Section tracking** | Global across phases | Per-phase (each specialist earns independently) |
-| **Re-view behavior** | Free (no step cost) | Free (no step cost) |
+| `view_section` | All specialists | `section` |
+| `ask_clarification` | Skills, Timeline | `question` |
+| `check_reference` | Fraud only | `reference_id` (ref1/ref2) |
+| `verify_credential` | Fraud only | — |
+| `submit_specialist_report` | All specialists | `findings`, `has_issues`, `specialist_confidence` |
+| `read_reports` | Overseer only | `report_target` |
+| `request_reinvestigation` | Overseer only | `reinvestigation_target`, `reinvestigation_reason` |
+| `submit_final_decision` | Overseer only | `decision`, `fraud_flag`, `confidence`, `fraud_reasoning` |
+
+### Observation Space
+
+Each observation includes: `current_phase`, `role_instructions`, `job_description`, `visible_sections` (role-filtered), `specialist_reports`, `available_actions`, `reference_response`, `verification_result`, `clarification_response`, `steps_remaining`, `total_steps_remaining`, `violations_count`, `reports_read`, `read_report_details`, `feedback`.
 
 ---
 
-**OpenEnv Compliance**: v3.0.0
-**Deployment**: [IshikaMahadar/resume-env](https://huggingface.co/spaces/IshikaMahadar/resume-env)
+## 📋 OpenEnv Compliance
+
+- **Spec version**: 1
+- **`openenv.yaml`**: [view](./openenv.yaml)
+- **Deployment**: [IshikaMahadar/resume-env](https://huggingface.co/spaces/IshikaMahadar/resume-env)
+- **Version**: 3.0.0
