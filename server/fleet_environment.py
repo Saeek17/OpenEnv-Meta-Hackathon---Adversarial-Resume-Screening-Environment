@@ -786,7 +786,7 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
         return per_spec * len(correct), correct
 
     def _reward_investigation_quality(self, gt: dict) -> float:
-        """Component C: Investigation depth and tool use (0.0 – 0.05)."""
+        """Component E: Investigation depth and tool use (0.0 – 0.05)."""
         n_sections   = len(set(self._sections_viewed))
         max_sections = len(self._sample.get("resume_sections", {}) or {})
         depth_ratio  = n_sections / max_sections if max_sections > 0 else 0.0
@@ -802,7 +802,7 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
 
     def _reward_format_compliance(self, fraud_flag: bool, fraud_reasoning: str,
                                    gt: dict) -> float:
-        """Component D: Fraud reasoning quality and format compliance (0.0 – 0.05)."""
+        """Component F: Fraud reasoning quality and format compliance (0.0 – 0.05)."""
         if fraud_flag and len(fraud_reasoning.strip()) < 15:
             return -0.05   # penalty: fraud flagged with no reasoning
         indicators = gt.get("fraud_indicators", [])
@@ -817,144 +817,116 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
             return 0.02   # correctly identified clean resume
         return 0.0
 
+    def _reward_fleet_coordination(self, both_correct: bool,
+                                    correct_specialists: list) -> float:
+        """Component C: Fleet coordination bonus (0.0 – 0.08).
+
+        Rewards the full fleet working in harmony — all three specialists AND
+        the overseer reaching the correct conclusion together.  Raised from
+        0.03 → 0.08 to meaningfully incentivise multi-agent cooperation over
+        a single-agent shortcut strategy.
+        """
+        if both_correct and len(correct_specialists) == 3:
+            return 0.08
+        return 0.0
+
+    def _reward_oversight_quality(self, gt: dict) -> float:
+        """Component D: Overseer read thoroughness + reinvestigation (0.0 – 0.08)."""
+        n_reports_total = len(self._specialist_reports)
+        n_reports_read  = len(set(self._reports_read))
+        r = 0.0
+        # D1: Read-thoroughness — must read reports before deciding
+        if n_reports_total > 0 and n_reports_read >= n_reports_total:
+            r += 0.04   # read ALL reports
+        elif n_reports_read > 0:
+            r += 0.01   # read at least one
+        # D2: Reinvestigation appropriateness
+        if self._reinvestigation_used and gt["is_fraud"]:
+            r += 0.04   # correctly escalated a fraud case
+        elif not self._reinvestigation_used and not gt["is_fraud"]:
+            r += 0.03   # efficient: no wasted reinvestigation on clean resume
+        return r
+
+    def _reward_step_efficiency(self, both_correct: bool) -> float:
+        """Component G: Step efficiency bonus (0.0 – 0.04, only when correct).
+
+        Rewards decisive agents that reach correct decisions without exhausting
+        their full step budget.
+        """
+        if both_correct and self._max_total_steps > 0:
+            steps_used_ratio = self._total_steps_used / self._max_total_steps
+            efficiency       = max(0.0, 1.0 - steps_used_ratio)
+            return round(0.04 * efficiency, 4)
+        return 0.0
+
     def _handle_submit_final_decision(self, action: FleetAction) -> FleetObservation:
         """
         Terminal reward function for the fleet episode.
 
-        Component breakdown (maximum possible before clamping ≈ 1.15):
-        ┌─────────────────────────────────────────────┬──────────┐
-        │ Component                                   │  Max     │
-        ├─────────────────────────────────────────────┼──────────┤
-        │ Correct hiring decision                     │  +0.35   │
-        │ Correct fraud flag                          │  +0.25   │
-        │ Calibrated confidence (when both correct)   │  +0.10   │
-        │ Specialist quality (tier-scaled, 3 agents)  │  +0.22   │
-        │ Fleet coordination (all 3 + overseer right) │  +0.03   │
-        │ Read thoroughness (all reports read)        │  +0.04   │
-        │ Reinvestigation appropriateness             │  +0.04   │
-        │ Investigation depth (sections + tools)      │  +0.05   │
-        │ Fraud reasoning quality                     │  +0.05   │
-        │ Step efficiency (when both correct)         │  +0.04   │
-        ├─────────────────────────────────────────────┼──────────┤
-        │ Violation penalty (−0.05 each, max −0.25)   │  −0.25   │
-        ├─────────────────────────────────────────────┼──────────┤
-        │ Final reward: clamped to [0.0, 1.0]         │   1.0    │
-        └─────────────────────────────────────────────┴──────────┘
+        Delegates to seven independent sub-functions — one per reward component.
+        Each sub-function can be read, tested, and tuned in isolation.
+
+        Component breakdown (maximum possible before clamping ≈ 1.20):
+        ┌──────────────────────────────────────────────────────┬──────────┐
+        │ Component (sub-function)                             │  Max     │
+        ├──────────────────────────────────────────────────────┼──────────┤
+        │ A: Decision accuracy   _reward_decision_accuracy     │  +0.70   │
+        │ B: Specialist quality  _reward_specialist_quality    │  +0.22   │
+        │ C: Fleet coordination  _reward_fleet_coordination    │  +0.08   │
+        │ D: Oversight quality   _reward_oversight_quality     │  +0.08   │
+        │ E: Investigation depth _reward_investigation_quality │  +0.05   │
+        │ F: Format compliance   _reward_format_compliance     │  +0.05   │
+        │ G: Step efficiency     _reward_step_efficiency       │  +0.04   │
+        ├──────────────────────────────────────────────────────┼──────────┤
+        │ H: Violation penalty   (−0.05 each, max −0.25)       │  −0.25   │
+        ├──────────────────────────────────────────────────────┼──────────┤
+        │ Final reward: clamped to [0.0, 1.0]                  │   1.0    │
+        └──────────────────────────────────────────────────────┴──────────┘
         """
         self._done = True
         gt = self._sample["ground_truth"]
 
-        decision = (action.decision or "reject").lower()
-        fraud_flag = action.fraud_flag if action.fraud_flag is not None else False
-        confidence = float(action.confidence or 0.5)
-        confidence = max(0.0, min(1.0, confidence))
+        decision        = (action.decision or "reject").lower()
+        fraud_flag      = action.fraud_flag if action.fraud_flag is not None else False
+        confidence      = max(0.0, min(1.0, float(action.confidence or 0.5)))
         fraud_reasoning = action.fraud_reasoning or ""
-        tier_mult = {"easy": 1.0, "medium": 1.1, "hard": 1.3}.get(self._task_type, 1.0)
+        tier_mult       = {"easy": 1.0, "medium": 1.1, "hard": 1.3}.get(self._task_type, 1.0)
 
-        reward = 0.0
+        # Derived flag needed by C and G sub-functions
+        both_correct = (decision == gt["decision"]) and (fraud_flag == gt["is_fraud"])
 
-        # Require non-trivial reasoning when flagging fraud (anti-exploit)
-        if fraud_flag and len(fraud_reasoning.strip()) < 15:
-            reward = max(0.0, reward - 0.05)
+        # ── A: Decision accuracy (includes confidence reward + anti-exploit) ─
+        reward  = self._reward_decision_accuracy(decision, fraud_flag, confidence, gt)
 
-        # ── A: Overseer decision accuracy (up to 0.70) ───────────────
-        correct_decision = (decision == gt["decision"])
-        correct_fraud    = (fraud_flag == gt["is_fraud"])
-        both_correct     = correct_decision and correct_fraud
+        # ── B: Specialist quality ─────────────────────────────────────────────
+        spec_reward, correct_specialists = self._reward_specialist_quality(tier_mult)
+        reward += spec_reward
 
-        if correct_decision:
-            reward += 0.35
-        if correct_fraud:
-            reward += 0.25
-        # Calibrated confidence: only rewarded when both correct
-        if both_correct:
-            reward += round(0.10 * confidence, 4)
-        # Confidence miscalibration penalty — discourages overconfident wrong answers
-        if not both_correct and confidence >= 0.7:
-            reward = max(0.0, reward - 0.05)
+        # ── C: Fleet coordination ─────────────────────────────────────────────
+        reward += self._reward_fleet_coordination(both_correct, correct_specialists)
 
-        # ── B: Specialist quality bonus (tier-scaled, up to ~0.22) ───
-        # Each correct specialist earns (0.20/3) × tier_mult.
-        # easy: 0.0667 each  |  medium: 0.0734  |  hard: 0.0867
-        per_specialist = round((0.20 / 3) * tier_mult, 4)
-        correct_specialists = []
-        for report in self._specialist_reports:
-            if self._specialist_was_correct(report):
-                reward += per_specialist
-                correct_specialists.append(report.specialist_role)
+        # ── D: Oversight quality ──────────────────────────────────────────────
+        reward += self._reward_oversight_quality(gt)
 
-        # ── C: Fleet coordination bonus (up to 0.03) ─────────────────
-        # Extra reward when all three specialists AND the overseer are correct:
-        # this only happens when the entire fleet works in harmony.
-        if both_correct and len(correct_specialists) == 3:
-            reward += 0.03
+        # ── E: Investigation depth ────────────────────────────────────────────
+        reward += self._reward_investigation_quality(gt)
 
-        # ── D: Oversight quality (up to 0.08) ────────────────────────
-        # D1: Read-thoroughness — reading reports before deciding
-        n_reports_total = len(self._specialist_reports)
-        n_reports_read  = len(set(self._reports_read))
-        if n_reports_total > 0 and n_reports_read >= n_reports_total:
-            reward += 0.04   # read ALL reports
-        elif n_reports_read > 0:
-            reward += 0.01   # read at least one
+        # ── F: Format & fraud reasoning ───────────────────────────────────────
+        reward += self._reward_format_compliance(fraud_flag, fraud_reasoning, gt)
 
-        # D2: Reinvestigation appropriateness
-        if self._reinvestigation_used and gt["is_fraud"]:
-            reward += 0.04   # correctly escalated a fraud case
-        elif not self._reinvestigation_used and not gt["is_fraud"]:
-            reward += 0.03   # efficient: no wasted reinvestigation on a clean resume
+        # ── G: Step efficiency ────────────────────────────────────────────────
+        reward += self._reward_step_efficiency(both_correct)
 
-        # ── E: Investigation depth bonus (continuous, up to 0.05) ────
-        # Rewards broad evidence gathering across all specialist phases
-        n_sections   = len(set(self._sections_viewed))
-        max_sections = len(self._sample.get("resume_sections", {}) or {})
-        depth_ratio  = n_sections / max_sections if max_sections > 0 else 0.0
-        tool_count   = (self._references_checked
-                        + self._verifications_done
-                        + self._clarifications_asked)
-        tool_ratio   = min(tool_count / 3.0, 1.0)
-        depth_score  = depth_ratio * 0.6 + tool_ratio * 0.4
-        reward += round(0.05 * depth_score, 4)
-        # Anti-shortcut: penalise zero tool use on fraud resumes
-        if gt["is_fraud"] and tool_count == 0:
-            reward = max(0.0, reward - 0.05)
-
-        # ── F: Fraud reasoning quality (up to 0.05) ──────────────────
-        # Match fraud_reasoning text against known fraud indicators.
-        # Accepts both underscore-form ("fabricated_reference") and
-        # space-form ("fabricated reference") for robustness.
-        fraud_indicators = gt.get("fraud_indicators", [])
-        if fraud_indicators and fraud_reasoning:
-            reasoning_lower = fraud_reasoning.lower()
-            matched = 0
-            for ind in fraud_indicators:
-                phrase_underscore = ind.lower()
-                phrase_space      = ind.replace("_", " ").lower()
-                # Match any individual keyword in the indicator
-                keywords = phrase_space.split()
-                keyword_hit = any(kw in reasoning_lower for kw in keywords if len(kw) > 3)
-                if phrase_underscore in reasoning_lower or phrase_space in reasoning_lower or keyword_hit:
-                    matched += 1
-            reward += round(0.05 * (matched / len(fraud_indicators)), 4)
-        elif not fraud_indicators and not fraud_flag:
-            reward += 0.02   # correctly identified a clean resume
-
-        # ── G: Step efficiency bonus (up to 0.04, only when correct) ─
-        # Rewards decisive agents that reach correct decisions without
-        # exhausting their full step budget.
-        if both_correct and self._max_total_steps > 0:
-            steps_used_ratio = self._total_steps_used / self._max_total_steps
-            efficiency       = max(0.0, 1.0 - steps_used_ratio)
-            reward += round(0.04 * efficiency, 4)
-
-        # ── H: Violation penalty (Day 2) ─────────────────────────────
+        # ── H: Violation penalty ─────────────────────────────────────────────
         violation_penalty = compute_violation_penalty(self._violations_count)
         reward = max(0.0, reward - violation_penalty)
 
-        # ── Final clamp ───────────────────────────────────────────────
+        # ── Final clamp ───────────────────────────────────────────────────────
         final_reward = max(0.0, min(1.0, reward))
 
         # Build feedback breakdown for transparency
+        n_reports_total = len(self._specialist_reports)
+        n_reports_read  = len(set(self._reports_read))
         violation_note = (
             f" Violations: {self._violations_count} (−{violation_penalty:.2f})."
             if self._violations_count > 0 else ""
