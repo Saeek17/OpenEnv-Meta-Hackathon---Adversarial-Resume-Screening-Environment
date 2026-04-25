@@ -16,6 +16,24 @@ tags: [openenv]
 
 ---
 
+## Materials
+
+| Resource | Link |
+|:---|:---|
+| **Live Environment** | [HuggingFace Space](https://huggingface.co/spaces/IshikaMahadar/resume-env) |
+| **Colab Training Notebook** | [train_grpo_fleet.ipynb](./train_grpo_fleet.ipynb) |
+| **Trained LoRA Adapter** | `grpo_results/grpo_fleet_output/final/` (in this repo) |
+| **Reward Curve** | ![Reward Curve](assets/reward_curve.png) |
+| **GitHub Repo** | [Ishika-eng/OpenEnv-Meta-Hackathon](https://github.com/Ishika-eng/OpenEnv-Meta-Hackathon---Adversarial-Resume-Screening-Environment) |
+
+### Training Results
+- **Model**: `Qwen/Qwen2.5-1.5B-Instruct` + LoRA (r=16, targeting q_proj + v_proj)
+- **Training**: GRPO, 2 epochs, 800 steps, T4 GPU (Google Colab)
+- **Reward**: Start **0.736** → Best **0.850** (+15.5% improvement)
+- **Dataset**: 36 episodes × ~11 steps each ≈ 396 training prompts
+
+---
+
 ## Overview & Motivation
 
 Automated hiring systems are increasingly targeted by **adversarial resumes** — CVs crafted with fabricated credentials, inflated titles, and keyword stuffing to bypass AI filters. While Round 1 used a single agent to catch these, a single investigator can be fooled by a sophisticated forgery that hides its flaws across different resume sections.
