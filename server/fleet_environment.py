@@ -155,7 +155,8 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
         self._phase_steps_used: int = 0
         self._total_steps_used: int = 0
         self._max_total_steps: int = 7
-        self._sections_viewed: List[str] = []
+        self._sections_viewed: List[str] = []           # global (for visibility)
+        self._sections_viewed_this_phase: List[str] = []  # per-phase (for reward/dedup)
         self._specialist_reports: List[SpecialistReport] = []
         self._references_checked: int = 0
         self._verifications_done: int = 0
@@ -188,6 +189,7 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
             "total_steps_used": self._total_steps_used,
             "max_total_steps": self._max_total_steps,
             "sections_viewed": list(self._sections_viewed),
+            "sections_viewed_this_phase": list(self._sections_viewed_this_phase),
             "specialist_reports": [r.model_dump() for r in self._specialist_reports],
             "references_checked": self._references_checked,
             "verifications_done": self._verifications_done,
@@ -217,6 +219,7 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
         self._total_steps_used = s["total_steps_used"]
         self._max_total_steps = s["max_total_steps"]
         self._sections_viewed = list(s["sections_viewed"])
+        self._sections_viewed_this_phase = list(s.get("sections_viewed_this_phase", []))
         self._specialist_reports = [
             SpecialistReport(**r) for r in s["specialist_reports"]
         ]
@@ -265,6 +268,7 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
         self._total_steps_used = 0
         self._max_total_steps = sum(PHASE_BUDGETS[self._task_type].values())
         self._sections_viewed = []
+        self._sections_viewed_this_phase = []
         self._specialist_reports = []
         self._references_checked = 0
         self._verifications_done = 0
@@ -318,8 +322,16 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
         if self._done or self._sample is None:
             return self._terminal_obs(reward=0.0, feedback="Episode already ended.")
 
-        self._phase_steps_used += 1
-        self._total_steps_used += 1
+        # Free re-view: viewing an already-seen section in the same phase
+        # gives informative feedback but does NOT consume a step.
+        _section_already_viewed = (
+            action.action_type == "view_section"
+            and bool(action.section)
+            and action.section.lower().strip() in self._sections_viewed_this_phase
+        )
+        if not _section_already_viewed:
+            self._phase_steps_used += 1
+            self._total_steps_used += 1
 
         current_phase = PHASES[self._phase_idx]
         phase_budget = PHASE_BUDGETS[self._task_type][current_phase]
@@ -364,7 +376,7 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
                 visible_sections=validator.filter_sections(self._get_visible_sections()),
                 specialist_reports=list(self._specialist_reports),
                 available_actions=validator.available_actions(
-                    self._sections_viewed,
+                    self._sections_viewed_this_phase,
                     self._references_checked,
                     self._verifications_done,
                 ),
@@ -405,7 +417,7 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
             visible_sections=validator.filter_sections(self._get_visible_sections()),
             specialist_reports=list(self._specialist_reports),
             available_actions=validator.available_actions(
-                self._sections_viewed,
+                self._sections_viewed_this_phase,
                 self._references_checked,
                 self._verifications_done,
             ),
@@ -445,6 +457,7 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
         # Advance to next phase
         self._phase_idx += 1
         self._phase_steps_used = 0
+        self._sections_viewed_this_phase = []   # reset per-phase section tracking
         self._last_clarification = None
         self._last_reference = None
         self._last_verification = None
@@ -472,7 +485,7 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
         else:
             next_validator = SpecialistActionValidator(SPECIALIST_CONFIGS[next_phase])
             next_available = next_validator.available_actions(
-                self._sections_viewed,
+                self._sections_viewed_this_phase,   # per-phase — always [] for a fresh phase
                 self._references_checked,
                 self._verifications_done,
                 self._reinvestigation_used,
@@ -917,10 +930,14 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
         if section not in VALID_SECTIONS:
             self._last_feedback = f"Invalid section '{section}'."
             return 0.0
-        if section in self._sections_viewed:
-            self._last_feedback = f"Section '{section}' already viewed."
+        if section in self._sections_viewed_this_phase:
+            self._last_feedback = f"Section '{section}' already viewed this phase."
             return 0.0
-        self._sections_viewed.append(section)
+        # Add to both: global list keeps it visible to future phases;
+        # per-phase list prevents duplicate reward within this phase.
+        self._sections_viewed_this_phase.append(section)
+        if section not in self._sections_viewed:
+            self._sections_viewed.append(section)
         tier_mult = {"easy": 1.0, "medium": 1.2, "hard": 1.5}.get(self._task_type, 1.0)
         base = 0.03 if section in HIGH_VALUE_SECTIONS else 0.01
         reward = round(base * tier_mult, 4)
@@ -1040,7 +1057,7 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
             return []
         validator = SpecialistActionValidator(config)
         return validator.available_actions(
-            self._sections_viewed,
+            self._sections_viewed_this_phase,
             self._references_checked,
             self._verifications_done,
             self._reinvestigation_used,
@@ -1085,6 +1102,7 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
         self._specialist_reports.append(report)
         self._phase_idx += 1
         self._phase_steps_used = 0
+        self._sections_viewed_this_phase = []   # reset per-phase section tracking
         self._last_clarification = None
         self._last_reference = None
         self._last_verification = None
@@ -1112,7 +1130,8 @@ class FleetResumeEnvironment(Environment[FleetObservation, FleetAction, FleetSta
         else:
             next_validator = SpecialistActionValidator(SPECIALIST_CONFIGS[next_phase])
             next_available = next_validator.available_actions(
-                self._sections_viewed, self._references_checked,
+                self._sections_viewed_this_phase,   # [] for a fresh phase
+                self._references_checked,
                 self._verifications_done, self._reinvestigation_used,
             )
             next_role_instructions = next_validator.role_instructions()
